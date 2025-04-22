@@ -1,0 +1,6 @@
+[general]
+name=Georreferenciamento Automático
+qgisMinimumVersion=3.24
+description=Plugin para georreferenciar imagens antigas automaticamente usando polígono delimitador e ortofoto base.
+version=0.1
+author=2cgeo_dsg
