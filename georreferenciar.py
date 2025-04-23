@@ -1,11 +1,12 @@
 import cv2
 import numpy as np
-import os
 import rasterio
-from rasterio.transform import from_bounds
+from rasterio.transform import from_origin
 from qgis.PyQt.QtWidgets import QMessageBox
+from qgis.core import QgsRectangle, QgsMapSettings, QgsMapRendererCustomPainterJob
+from PyQt5.QtGui import QImage, QPainter
+from PyQt5.QtCore import QSize
 
-from .recorte_referencia import recortar_imagem_referencia
 from .dependencias import verificar_dependencias
 
 verificar_dependencias()
@@ -17,38 +18,59 @@ def root_sift_detect_and_compute(image_gray):
     if descriptors is None or len(descriptors) == 0:
         return keypoints, None
 
-    # RootSIFT normalization
     descriptors /= (descriptors.sum(axis=1, keepdims=True) + 1e-7)
     descriptors = np.sqrt(descriptors)
-
     return keypoints, descriptors
+
+def renderizar_imagem_referencia(layer, poligono_geom, largura_px=1500):
+    bounds = poligono_geom.boundingBox()
+    altura_px = int((bounds.height() / bounds.width()) * largura_px)
+
+    map_settings = QgsMapSettings()
+    map_settings.setLayers([layer])
+    map_settings.setExtent(bounds)
+    map_settings.setOutputSize(QSize(largura_px, altura_px))
+    map_settings.setOutputDpi(96)
+
+    img = QImage(largura_px, altura_px, QImage.Format_RGB32)
+    img.fill(0)
+    painter = QPainter(img)
+
+    job = QgsMapRendererCustomPainterJob(map_settings, painter)
+    job.start()
+    job.waitForFinished()
+    painter.end()
+
+    ptr = img.bits()
+    ptr.setsize(img.byteCount())
+    arr = np.array(ptr).reshape((altura_px, largura_px, 4))
+
+    rgb = arr[:, :, :3]  # Remover canal alfa
+    return rgb, bounds, layer.crs().authid().replace("EPSG:", "")
 
 def georreferenciar(imagem_nao_geo_path, poligono_geom, layer_referencia, saida_path):
     try:
-        imagem_ref_crop, bounds_crop, epsg = recortar_imagem_referencia(layer_referencia, poligono_geom)
+        imagem_ref_crop, bounds_crop, epsg = renderizar_imagem_referencia(layer_referencia, poligono_geom)
 
-        img_original = cv2.imread(imagem_nao_geo_path, cv2.IMREAD_GRAYSCALE)
-        img_ref = imagem_ref_crop
+        img_original_color = cv2.imread(imagem_nao_geo_path)
+        img_original = cv2.cvtColor(img_original_color, cv2.COLOR_BGR2GRAY)
+        img_ref_gray = cv2.cvtColor(imagem_ref_crop, cv2.COLOR_BGR2GRAY)
 
-        if img_original is None or img_ref is None:
+        if img_original is None or img_ref_gray is None:
             raise ValueError("Não foi possível carregar as imagens.")
 
         kp1, desc1 = root_sift_detect_and_compute(img_original)
-        kp2, desc2 = root_sift_detect_and_compute(img_ref)
+        kp2, desc2 = root_sift_detect_and_compute(img_ref_gray)
 
         if desc1 is None or desc2 is None:
-            raise ValueError("Não foi possível extrair descritores.")
+            raise ValueError("Não foi possível extrair descritores com RootSIFT.")
 
-        # FLANN-based matcher
         index_params = dict(algorithm=1, trees=5)
         search_params = dict(checks=50)
         flann = cv2.FlannBasedMatcher(index_params, search_params)
         raw_matches = flann.knnMatch(desc1, desc2, k=2)
 
-        good_matches = []
-        for m, n in raw_matches:
-            if m.distance < 0.75 * n.distance:
-                good_matches.append(m)
+        good_matches = [m for m, n in raw_matches if m.distance < 0.75 * n.distance]
 
         if len(good_matches) < 4:
             raise ValueError("Poucos matches válidos encontrados para estimar homografia.")
@@ -61,27 +83,26 @@ def georreferenciar(imagem_nao_geo_path, poligono_geom, layer_referencia, saida_
         if H is None:
             raise ValueError("Homografia não pôde ser estimada.")
 
-        h, w = img_ref.shape[:2]
-        img_warped = cv2.warpPerspective(cv2.imread(imagem_nao_geo_path), H, (w, h))
+        h, w = img_original_color.shape[:2]
+        img_warped = cv2.warpPerspective(img_original_color, H, (imagem_ref_crop.shape[1], imagem_ref_crop.shape[0]))
 
-        transform = from_bounds(*bounds_crop, w, h)
+        x_res = (bounds_crop.width()) / imagem_ref_crop.shape[1]
+        y_res = (bounds_crop.height()) / imagem_ref_crop.shape[0]
+        transform = from_origin(bounds_crop.xMinimum(), bounds_crop.yMaximum(), x_res, y_res)
 
         with rasterio.open(
             saida_path,
             'w',
             driver='GTiff',
-            height=h,
-            width=w,
+            height=img_warped.shape[0],
+            width=img_warped.shape[1],
             count=3,
             dtype=img_warped.dtype,
             crs=f"EPSG:{epsg}",
             transform=transform,
         ) as dst:
-            if img_warped.ndim == 3:
-                for i in range(3):
-                    dst.write(img_warped[:, :, i], i + 1)
-            else:
-                dst.write(img_warped, 1)
+            for i in range(3):
+                dst.write(img_warped[:, :, i], i + 1)
 
         QMessageBox.information(None, "Sucesso", "Georreferenciamento concluído com sucesso.")
 

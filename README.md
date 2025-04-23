@@ -27,12 +27,13 @@ Essas bibliotecas são instaladas automaticamente na primeira execução. Caso a
 
 Se você precisar instalar manualmente as dependências, use os comandos abaixo no terminal:
 
-```bash
-pip install opencv-python
-pip install numpy
-pip install rasterio
-```
+use o QGIS LTR 3.40.6
 
+abra o OSGeo4W Shell e rode o comando:
+python3 -m pip install opencv-python rasterio numpy
+
+depois verifique se foi instalado corretamente com o comando:
+python -c "import cv2; print(cv2.__version__)"
 ---
 
 ## Requisitos
