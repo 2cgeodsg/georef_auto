@@ -4,10 +4,8 @@
 import cv2
 import numpy as np
 import rasterio
-import rasterio.warp # Adicionado
-import rasterio.transform # Adicionado
 import os
-# from rasterio.transform import from_origin # Removido/Comentado
+from rasterio.transform import from_origin
 from qgis.PyQt.QtWidgets import QMessageBox, QProgressDialog, QApplication
 from qgis.core import (
     QgsRectangle, QgsMapSettings, QgsMapRendererCustomPainterJob,
@@ -273,85 +271,38 @@ def georeference_image(image_path: str, polygon_geom: QgsGeometry,
         if progress_callback:
             progress_callback(95, "Salvando imagem georreferenciada...")
 
-# 9. Calcular transformação final e reamostrar para resolução desejada
-        from rasterio.warp import reproject, Resampling
-        import rasterio.transform
-
-        target_resolution = 1.0 # Resolução desejada em metros/unidade do CRS
-        logging.info(f"Resolução alvo definida para: {target_resolution} unidades do CRS.")
-
-        # Calcular resolução da imagem de referência renderizada (necessária para coordenadas)
+        # 9. Calcular novo geotransform e salvar com Rasterio
         x_res_ref = bounds_crop.width() / w_ref
         y_res_ref = bounds_crop.height() / h_ref
-
-        # Calcular coordenadas geográficas do retângulo da imagem recortada (img_recortada)
-        # x_min, y_min, x_max, y_max são os índices de pixel em img_warped_full
+        # Ajustar origem para o canto superior esquerdo do recorte
         nova_xmin = bounds_crop.xMinimum() + x_min * x_res_ref
         nova_ymax = bounds_crop.yMaximum() - y_min * y_res_ref
-        nova_xmax = bounds_crop.xMinimum() + (x_max + 1) * x_res_ref # Canto superior direito X
-        nova_ymin = bounds_crop.yMaximum() - (y_max + 1) * y_res_ref # Canto inferior esquerdo Y
+        # O transform usa a resolução da imagem *renderizada* como base
+        novo_transform = from_origin(nova_xmin, nova_ymax, x_res_ref, y_res_ref)
 
-        geo_width = nova_xmax - nova_xmin
-        geo_height = nova_ymax - nova_ymin
-
-        # Calcular dimensões em pixels para a resolução alvo
-        final_width = max(1, round(geo_width / target_resolution))
-        final_height = max(1, round(geo_height / target_resolution))
-
-        logging.info(f"Calculadas dimensões finais: {final_width}x{final_height} pixels para resolução {target_resolution}.")
-
-        # Definir propriedades da fonte (imagem recortada como está)
-        # A imagem recortada (img_recortada) tem pixels que correspondem à grade da referência
-        src_transform = rasterio.transform.from_origin(nova_xmin, nova_ymax, x_res_ref, y_res_ref)
-        src_crs = f"EPSG:{epsg}"
-        # img_recortada tem shape (nova_altura, nova_largura, 3) e ordem BGR
-
-        # Definir propriedades do destino (nova grade com resolução alvo)
-        dst_transform = rasterio.transform.from_origin(nova_xmin, nova_ymax, target_resolution, target_resolution)
-        dst_crs = src_crs
-        destination_array = np.zeros((3, final_height, final_width), dtype=img_recortada.dtype) # Formato CHW
-
-        # Reamostrar cada banda de BGR (OpenCV) para RGB (Rasterio) e para a nova grade/resolução
-        # Banda 0 (B) -> destination_array[2]
-        # Banda 1 (G) -> destination_array[1]
-        # Banda 2 (R) -> destination_array[0]
-        source_bands_rgb_order = [img_recortada[:, :, 2], img_recortada[:, :, 1], img_recortada[:, :, 0]] # R, G, B
-
-        logging.info("Iniciando reamostragem com Resampling.cubic...")
-        for i in range(3):
-             reproject(
-                 source=source_bands_rgb_order[i], # Banda fonte (R, G ou B)
-                 destination=destination_array[i],  # Banda destino correspondente
-                 src_transform=src_transform,
-                 src_crs=src_crs,
-                 src_nodata=0, # Assumir que pixels pretos na imagem recortada são nodata
-                 dst_transform=dst_transform,
-                 dst_crs=dst_crs,
-                 dst_nodata=0, # Manter nodata como 0 no destino
-                 resampling=Resampling.cubic # Usar cúbico para melhor qualidade visual
-             )
-        logging.info("Reamostragem concluída.")
-
-        # Salvar o array reamostrado
         with rasterio.open(
             output_path,
             'w',
             driver='GTiff',
-            height=final_height,
-            width=final_width,
-            count=3,
-            dtype=destination_array.dtype,
-            crs=dst_crs,
-            transform=dst_transform,
-            nodata=0, # Definir valor nodata no metadado
-            compress='JPEG',
-            jpeg_quality=85, # Qualidade JPEG (75-95 é um bom intervalo)
-            photometric='YCBCR' # Necessário para compressão JPEG em GeoTIFF
+            height=nova_altura,
+            width=nova_largura,
+            count=3, # Assumindo 3 bandas (RGB)
+            dtype=img_recortada.dtype,
+            crs=f"EPSG:{epsg}",
+            transform=novo_transform,
+            compress='LZW' # Adicionar compressão
         ) as dst:
-            dst.write(destination_array) # Escrever array (CHW)
+            # Rasterio espera (band, row, col), OpenCV usa (row, col, band - BGR)
+            for i in range(3):
+                # OpenCV é BGR, GeoTIFF geralmente é RGB. Banda 0 (B) -> Banda 3 (Blue)? Não, BGR -> RGB
+                # Banda 0 (B) -> Rasterio Banda 3
+                # Banda 1 (G) -> Rasterio Banda 2
+                # Banda 2 (R) -> Rasterio Banda 1
+                # Correção: Rasterio espera ordem RGB (1, 2, 3)
+                dst.write(img_recortada[:, :, 2-i], i + 1) # Escreve R, G, B
 
-        logging.info(f"Imagem georreferenciada e reamostrada salva com sucesso em: {output_path}")
-        return True, f"Georreferenciamento concluído com sucesso (resolução ~{target_resolution}m): {os.path.basename(output_path)}"
+        logging.info(f"Imagem georreferenciada salva com sucesso em: {output_path}")
+        return True, f"Georreferenciamento concluído com sucesso: {os.path.basename(output_path)}"
 
     except ValueError as ve:
         logging.error(f"Erro de valor durante georreferenciamento: {ve}")
