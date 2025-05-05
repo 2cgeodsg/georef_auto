@@ -6,62 +6,149 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>400</width>
-    <height>300</height>
+    <width>500</width>
+    <height>480</height>
    </rect>
   </property>
   <property name="windowTitle">
-   <string>Georreferenciamento automático</string>
+   <string>Automatic Georeferencing</string>
   </property>
-  <widget class="QWidget" name="formLayoutWidget">
-   <property name="geometry">
-    <rect>
-     <x>20</x>
-     <y>30</y>
-     <width>360</width>
-     <height>241</height>
-    </rect>
-   </property>
-   <layout class="QFormLayout" name="formLayout">
-    <item row="0" column="0">
-     <widget class="QPushButton" name="btnCarregarImagem">
-      <property name="text">
-       <string>Carregar imagem</string>
-      </property>
-     </widget>
-    </item>
-    <item row="1" column="0" colspan="2">
-     <widget class="QComboBox" name="comboLayerReferencia">
+  <layout class="QVBoxLayout" name="verticalLayout">
+   <item>
+    <widget class="QGroupBox" name="groupBoxImages">
+     <property name="title">
+      <string>Images</string>
+     </property>
+     <layout class="QVBoxLayout" name="verticalLayout_2">
       <item>
-       <property name="text">
-        <string>Selecionar imagem de referência</string>
-       </property>
+       <layout class="QHBoxLayout" name="horizontalLayout">
+        <item>
+         <widget class="QPushButton" name="btnLoadSingleImage">
+          <property name="text">
+           <string>Load Single Image</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QPushButton" name="btnLoadMultipleImages">
+          <property name="text">
+           <string>Load Multiple Images</string>
+          </property>
+         </widget>
+        </item>
+       </layout>
       </item>
-     </widget>
-    </item>
-    <item row="2" column="0">
-     <widget class="QPushButton" name="btnDesenharPoligono">
-      <property name="text">
-       <string>Desenhar polígono</string>
-      </property>
-     </widget>
-    </item>
-    <item row="3" column="0">
-     <widget class="QPushButton" name="btnGeorreferenciar">
-      <property name="text">
-       <string>Executar georreferenciamento</string>
-      </property>
-     </widget>
-    </item>
-    <item row="3" column="1">
-     <widget class="QPushButton" name="btnCancelar">
-      <property name="text">
-       <string>Cancelar</string>
-      </property>
-     </widget>
-    </item>
-   </layout>
-  </widget>
+      <item>
+       <widget class="QListWidget" name="listImages">
+        <property name="selectionMode">
+         <enum>QAbstractItemView::ExtendedSelection</enum>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <layout class="QHBoxLayout" name="horizontalLayout_2">
+        <item>
+         <widget class="QPushButton" name="btnRemoveImage">
+          <property name="text">
+           <string>Remove Selected</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QPushButton" name="btnClearImages">
+          <property name="text">
+           <string>Clear All</string>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item>
+    <widget class="QGroupBox" name="groupBoxReference">
+     <property name="title">
+      <string>Reference Layer</string>
+     </property>
+     <layout class="QVBoxLayout" name="verticalLayout_3">
+      <item>
+       <widget class="QComboBox" name="comboReferenceLayer"/>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item>
+    <widget class="QGroupBox" name="groupBoxPolygon">
+     <property name="title">
+      <string>Bounding Polygon</string>
+     </property>
+     <layout class="QVBoxLayout" name="verticalLayout_4">
+      <item>
+       <widget class="QPushButton" name="btnDrawPolygon">
+        <property name="text">
+         <string>Draw Bounding Polygon</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QLabel" name="labelPolygonStatus">
+        <property name="text">
+         <string>No polygon drawn</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QLabel" name="labelPolygonArea">
+        <property name="text">
+         <string>Area: 0.00 km² (max: 3,050 km²)</string>
+        </property>
+        <property name="styleSheet">
+         <string>font-weight: bold;</string>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item>
+    <widget class="QGroupBox" name="groupBoxOptions">
+     <property name="title">
+      <string>Options</string>
+     </property>
+     <layout class="QVBoxLayout" name="verticalLayout_5">
+      <item>
+       <widget class="QCheckBox" name="checkBoxAddToProject">
+        <property name="text">
+         <string>Add georeferenced images to project</string>
+        </property>
+        <property name="checked">
+         <bool>true</bool>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item>
+    <layout class="QHBoxLayout" name="horizontalLayout_3">
+     <item>
+      <widget class="QPushButton" name="btnGeoreference">
+       <property name="text">
+        <string>Execute Georeferencing</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QPushButton" name="btnCancel">
+       <property name="text">
+        <string>Cancel</string>
+       </property>
+      </widget>
+     </item>
+    </layout>
+   </item>
+  </layout>
  </widget>
  <resources/>
  <connections/>
