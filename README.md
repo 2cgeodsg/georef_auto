@@ -1,52 +1,26 @@
-# Georreferenciamento Automático
+# GeorefAuto Plugin
 
-Plugin para QGIS que permite georreferenciar imagens antigas automaticamente com base em uma imagem de referência já georreferenciada e um polígono delimitador desenhado sobre ela.
+## Overview
+GeorefAuto is a QGIS plugin for automatic georeferencing of aerial images using computer vision algorithms (RootSIFT, FLANN, and RANSAC). It allows you to georeference images by simply defining a bounding polygon that approximately contains the area where the image should be located.
 
-## Funcionalidades
+## Key Features
+1. **Batch Processing** - Process multiple images at once using the same bounding polygon
+2. **Large Area Support** - Efficiently handle large bounding polygons (up to 3050 km²)
+3. **Automatic Scale Recognition** - Automatically detects image scale regardless of zoom level
+4. **User-Friendly Interface** - Intuitive UI with clear workflow
 
-- Carregamento de imagem não georreferenciada;
-- Seleção de imagem base entre as camadas raster abertas no QGIS;
-- Desenho manual do polígono delimitador da área estimada;
-- Georreferenciamento automático por detecção e pareamento de feições locais usando **RootSIFT + FLANN + RANSAC**;
-- Exportação da imagem georreferenciada em formato GeoTIFF;
-- Detecção automática e instalação de dependências via `pip`.
+## Installation
+1. Open QGIS
+2. Go to Plugins → Manage and Install Plugins
+3. Click on "Install from ZIP"
+4. Browse to the GeorefAuto.zip file and click "Install Plugin"
 
----
+## Requirements
+- QGIS 3.0 or higher
+- Python dependencies (automatically installed if missing):
+  - OpenCV (cv2)
+  - Rasterio
+  - NumPy
 
-## Dependências
-
-Este plugin depende das seguintes bibliotecas Python externas:
-
-- `opencv-python`
-- `numpy`
-- `rasterio`
-
-Essas bibliotecas são instaladas automaticamente na primeira execução. Caso a instalação automática falhe (por exemplo, por falta de permissões), será exibida uma mensagem com instruções para instalação manual.
-
-### Instalação Manual (se necessário)
-
-Se você precisar instalar manualmente as dependências, use os comandos abaixo no terminal:
-
-use o QGIS LTR 3.40.6
-
-abra o OSGeo4W Shell e rode o comando:
-python3 -m pip install opencv-python rasterio numpy
-
-depois verifique se foi instalado corretamente com o comando:
-python -c "import cv2; print(cv2.__version__)"
----
-
-## Requisitos
-
-- QGIS 3.10 ou superior (recomendado: QGIS 3.22+)
-- Python 3.7+ com suporte a `pip`
-
----
-
-## Como usar
-
-1. Abra o QGIS e ative o plugin "Georreferenciamento Automático".
-2. Carregue a imagem a ser georreferenciada.
-3. Selecione uma camada raster de referência.
-4. Desenhe um polígono delimitador da área estimada de sobreposição.
-5. Clique em "Executar georreferenciamento" para gerar uma nova imagem georreferenciada.
+## Usage
+See the included documentation.html file for detailed usage instructions.

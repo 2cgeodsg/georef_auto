@@ -1,5 +1,5 @@
-<RCC>
-    <qresource prefix="/">
-        <file>icon.png</file>
-    </qresource>
-</RCC>
+<!DOCTYPE qgis-resource-file>
+<qgis-resource-file>
+  <qresource prefix="/plugins/georef_auto">
+  </qresource>
+</qgis-resource-file>
