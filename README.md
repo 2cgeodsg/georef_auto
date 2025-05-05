@@ -10,13 +10,15 @@ GeorefAuto is a QGIS plugin for automatic georeferencing of aerial images using 
 4. **User-Friendly Interface** - Intuitive UI with clear workflow
 
 ## Installation
-1. Open QGIS
-2. Go to Plugins → Manage and Install Plugins
-3. Click on "Install from ZIP"
-4. Browse to the GeorefAuto.zip file and click "Install Plugin"
+1. Open the OSGeo4W Shell (be aware to open the OSGeo4W Shell from QGIS 3.40.6, you may have installed in your PC other Shells from other QGIS versions) and run: python3 -m pip install opencv-python rasterio numpy
+2. Verify the installation, run: python -c "import cv2; print(cv2.version)"
+3. Open QGIS 3.40.6
+4. Go to Plugins → Manage and Install Plugins
+5. Click on "Install from ZIP"
+6. Browse to the GeorefAuto.zip file and click "Install Plugin"
 
 ## Requirements
-- QGIS 3.0 or higher
+- QGIS 3.40.6 or higher
 - Python dependencies (automatically installed if missing):
   - OpenCV (cv2)
   - Rasterio
