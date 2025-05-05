@@ -1,6 +1,39 @@
 [general]
-name=Georreferenciamento Automático
-qgisMinimumVersion=3.24
-description=Plugin para georreferenciar imagens antigas automaticamente usando polígono delimitador e ortofoto base.
-version=0.1
+name=GeorefAuto
+qgisMinimumVersion=3.40
+description=Automatic georeferencing of aerial images
+version=1.0
 author=2cgeo_dsg
+
+about=This plugin provides automatic georeferencing of aerial images using RootSIFT, FLANN, and RANSAC algorithms. It allows batch processing of multiple images using a single bounding polygon.
+
+tracker=https://github.com/example/georef_auto/issues
+repository=https://github.com/example/georef_auto
+# End of mandatory metadata
+
+# Recommended items:
+
+hasProcessingProvider=no
+# Uncomment the following line and add your changelog:
+# changelog=
+
+# Tags are comma separated with spaces allowed
+tags=python,georeferencing,aerial,image,raster
+
+homepage=https://github.com/example/georef_auto
+category=Raster
+icon=icon.png
+
+# deprecated flag (applies to the whole plugin, not just a single version)
+deprecated=False
+
+# Since QGIS 3.8, a comma separated list of plugins to be installed
+# (or upgraded) can be specified.
+# Check the documentation for more information.
+# plugin_dependencies=
+
+Category of the plugin: Raster, Vector, Database or Web
+# category=
+
+# If the plugin can run on QGIS Server.
+server=False

@@ -1,0 +1,124 @@
+<html>
+<head>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            margin: 20px;
+            color: #333;
+        }
+        h1 {
+            color: #2c3e50;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 10px;
+        }
+        h2 {
+            color: #2980b9;
+            margin-top: 20px;
+        }
+        .feature {
+            background-color: #f8f9fa;
+            border-left: 4px solid #3498db;
+            padding: 10px 15px;
+            margin: 15px 0;
+        }
+        code {
+            background-color: #f0f0f0;
+            padding: 2px 4px;
+            border-radius: 3px;
+            font-family: Consolas, monospace;
+        }
+        pre {
+            background-color: #f0f0f0;
+            padding: 10px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+        .note {
+            background-color: #fffacd;
+            border-left: 4px solid #f1c40f;
+            padding: 10px 15px;
+            margin: 15px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>GeorefAuto Plugin Documentation</h1>
+    
+    <p>GeorefAuto is a QGIS plugin for automatic georeferencing of aerial images. It uses computer vision algorithms (RootSIFT, FLANN, and RANSAC) to automatically match features between non-georeferenced images and a reference layer.</p>
+    
+    <h2>Features</h2>
+    
+    <div class="feature">
+        <h3>Batch Processing</h3>
+        <p>Process multiple images at once using the same bounding polygon. The plugin automatically adds "_georef" to the original filename for each processed image.</p>
+    </div>
+    
+    <div class="feature">
+        <h3>Large Bounding Polygon Support</h3>
+        <p>Support for very large bounding polygons (up to 3050 km²) to make it easier to define the approximate area where the non-georeferenced images should be located.</p>
+    </div>
+    
+    <div class="feature">
+        <h3>Automatic Scale Recognition</h3>
+        <p>The plugin automatically recognizes the approximate scale of non-georeferenced images and adjusts the reference scale appropriately, ensuring the comparison and registration algorithms work effectively regardless of zoom level.</p>
+    </div>
+    
+    <h2>Installation</h2>
+    
+    <ol>
+        <li>Open QGIS</li>
+        <li>Go to <code>Plugins → Manage and Install Plugins</code></li>
+        <li>Click on <code>Install from ZIP</code></li>
+        <li>Browse to the GeorefAuto.zip file and click <code>Install Plugin</code></li>
+    </ol>
+    
+    <h2>Usage</h2>
+    
+    <h3>Basic Workflow</h3>
+    
+    <ol>
+        <li>Load a reference layer in QGIS (this should be a georeferenced image or map that covers the area where your non-georeferenced images are located)</li>
+        <li>Click on the GeorefAuto icon in the toolbar to open the plugin</li>
+        <li>Load one or more non-georeferenced images</li>
+        <li>Select the reference layer from the dropdown</li>
+        <li>Click "Draw Bounding Polygon" and draw a polygon around the approximate area where your images should be located</li>
+        <li>Click "Execute Georeferencing" to start the process</li>
+        <li>If processing a single image, you'll be prompted to specify the output location</li>
+        <li>If processing multiple images, the plugin will automatically add "_georef" to each original filename</li>
+    </ol>
+    
+    <h3>Tips for Best Results</h3>
+    
+    <ul>
+        <li>The reference layer should have similar visual characteristics to the non-georeferenced images</li>
+        <li>The bounding polygon should be large enough to encompass the entire area where the images might be located</li>
+        <li>Images with distinct features (buildings, roads, etc.) will georeference more accurately than homogeneous areas (forests, water bodies)</li>
+        <li>For batch processing, ensure all images are from the same general area covered by the bounding polygon</li>
+    </ul>
+    
+    <div class="note">
+        <p><strong>Note:</strong> The plugin requires the following dependencies: OpenCV (cv2), Rasterio, and NumPy. These will be automatically installed if missing.</p>
+    </div>
+    
+    <h2>Technical Details</h2>
+    
+    <p>The plugin uses the following algorithms for image matching and georeferencing:</p>
+    
+    <ul>
+        <li><strong>RootSIFT</strong>: An improved version of the Scale-Invariant Feature Transform algorithm for feature detection and description</li>
+        <li><strong>FLANN</strong>: Fast Library for Approximate Nearest Neighbors for efficient feature matching</li>
+        <li><strong>RANSAC</strong>: Random Sample Consensus for robust homography estimation</li>
+    </ul>
+    
+    <h2>Troubleshooting</h2>
+    
+    <h3>Common Issues</h3>
+    
+    <ul>
+        <li><strong>Not enough matches found</strong>: Try using a reference layer that more closely resembles the non-georeferenced image</li>
+        <li><strong>Black output image</strong>: This usually indicates that the homography estimation failed. Try drawing a more precise bounding polygon</li>
+        <li><strong>Dependency errors</strong>: If automatic installation fails, manually install the required packages using pip</li>
+    </ul>
+</body>
+</html>
