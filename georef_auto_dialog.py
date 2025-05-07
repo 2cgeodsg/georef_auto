@@ -325,13 +325,7 @@ class GeorefAutoDialog(QDialog, Ui_GeorefAutoDialog):
                 # logging.debug(f"Layer {layer.name()} is VectorLayer but has invalid CRS.")
                 return False
                 
-        # Allow WMS/WMTS layers (often identified as RasterLayer, but check provider)
-        # This check might be redundant if they are already caught as RasterLayer
-        # provider = layer.dataProvider()
-        # if provider and provider.name().lower() in ["wms", "wmts", "xyz"]:
-        #     logging.debug(f"Layer {layer.name()} is a suitable WMS/WMTS/XYZ layer.")
-        #     return True
-            
+       
         # logging.debug(f"Layer {layer.name()} is not a suitable reference type.")
         return False
 
@@ -524,13 +518,7 @@ class GeorefAutoDialog(QDialog, Ui_GeorefAutoDialog):
             logging.error(f"An unexpected error occurred during batch georeferencing: {e}")
             logging.error(traceback.format_exc())
             QMessageBox.critical(self, "Georeferencing Error", f"An unexpected error occurred: {str(e)}")
-
-        # Reset state after processing (optional, maybe keep polygon/layer?)
-        # Consider clearing only images if user might want to reuse polygon/layer
-        # self.clear_all_images() # Clear images after processing?
-        # self.polygon_geometry = None # Clear polygon?
-        # self.update_polygon_area_display() # Update UI
-
+       
     def closeEvent(self, event):
         """
         Handle the dialog closing event.

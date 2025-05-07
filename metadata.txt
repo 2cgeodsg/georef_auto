@@ -7,8 +7,7 @@ author=2cgeo_dsg
 
 about=This plugin provides automatic georeferencing of aerial images using RootSIFT, FLANN, and RANSAC algorithms. It allows batch processing of multiple images using a single bounding polygon.
 
-tracker=https://github.com/example/georef_auto/issues
-repository=https://github.com/example/georef_auto
+repository=https://github.com/2cgeodsg/georef_auto
 # End of mandatory metadata
 
 # Recommended items:
@@ -20,7 +19,7 @@ hasProcessingProvider=no
 # Tags are comma separated with spaces allowed
 tags=python,georeferencing,aerial,image,raster
 
-homepage=https://github.com/example/georef_auto
+homepage=https://github.com/2cgeodsg/georef_auto
 category=Raster
 icon=icon.png
 

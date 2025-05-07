@@ -7,7 +7,6 @@ import rasterio
 import rasterio.warp # Adicionado
 import rasterio.transform # Adicionado
 import os
-# from rasterio.transform import from_origin # Removido/Comentado
 from qgis.PyQt.QtWidgets import QMessageBox, QProgressDialog, QApplication
 from qgis.core import (
     QgsRectangle, QgsMapSettings, QgsMapRendererCustomPainterJob,
@@ -20,13 +19,13 @@ import traceback
 import logging
 from typing import Tuple, List, Optional, Dict
 
-# Configurações (mantidas da versão nova onde aplicável)
+# Configurações
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 MAX_POLYGON_AREA = 3050.0  # km²
-MIN_FEATURES = 4 # Minimum matches for homography (from old version)
-RENDER_WIDTH_PX = 2000 # Width for rendering reference image (increased from old version's 1500)
+MIN_FEATURES = 4 # Minimum matches for homography
+RENDER_WIDTH_PX = 2000 # Width for rendering reference image
 
-# --- Funções Auxiliares (mantidas/adaptadas da versão nova) ---
+# --- Funções Auxiliares ---
 
 def is_geographic_crs(epsg_code: str) -> bool:
     """Verifica se o CRS é geográfico (graus)."""
@@ -67,7 +66,7 @@ def get_area_in_square_km(geometry: QgsGeometry, crs_authid: str) -> float:
         logging.error(f"Erro no cálculo de área: {e}")
         return 0.0
 
-# --- Lógica de Georreferenciamento (baseada na versão antiga georef_auto2) ---
+# --- Lógica de Georreferenciamento ---
 
 def root_sift_detect_and_compute(image_gray):
     """Detect SIFT features and compute RootSIFT descriptors."""
@@ -128,7 +127,6 @@ def render_reference_image(layer, polygon_geom, target_width_px=RENDER_WIDTH_PX)
         painter.end()
 
         # Convert QImage to NumPy array (handle potential format differences)
-        # Based on https://stackoverflow.com/questions/61281351/convert-qimage-to-numpy-array
         img_format = img.format()
         if img_format == QImage.Format_ARGB32_Premultiplied or img_format == QImage.Format_ARGB32:
             ptr = img.constBits()
@@ -426,7 +424,3 @@ def batch_georeference(image_paths: List[str], polygon_geom: QgsGeometry,
     progress.close() # Close the progress dialog
 
     return successful, failed
-
-# --- Funções removidas da versão nova (não funcionais ou substituídas) ---
-# estimate_image_resolution, calculate_adaptive_scale, match_features (versão WMS), etc.
-
