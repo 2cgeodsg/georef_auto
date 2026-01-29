@@ -7,6 +7,8 @@ from qgis.core import (
     QgsWkbTypes,
     QgsProject,
     QgsVectorLayer,
+    QgsCoordinateTransform,
+    QgsCoordinateReferenceSystem,
     QgsFeature,
     QgsFields,
     QgsField,
@@ -62,6 +64,15 @@ class MapToolPolygon(QgsMapTool):
         self.rubber_band.addPoint(self.vertices[0], True)
         geom = QgsGeometry.fromPolygonXY([self.vertices])
 
+        # Adicionar esta linha para atribuir o CRS à geometria
+        if self.epsg:
+            crs_dest = QgsCoordinateReferenceSystem(self.epsg)
+            crs_src = self.canvas.mapSettings().destinationCrs()
+            if crs_src != crs_dest:
+                transform = QgsCoordinateTransform(crs_src, crs_dest, QgsProject.instance())
+                geom.transform(transform)
+
+
         # Create temporary vector layer with correct CRS
         self._create_temporary_layer(geom)
 
@@ -86,20 +97,33 @@ class MapToolPolygon(QgsMapTool):
         
         provider = temp_layer.dataProvider()
 
-        # Add minimal fields
         fields = QgsFields()
         fields.append(QgsField("id", QVariant.Int))
         provider.addAttributes(fields)
         temp_layer.updateFields()
 
-        # Add feature with geometry
         feature = QgsFeature()
         feature.setGeometry(geometry)
         feature.setAttributes([1])
         provider.addFeatures([feature])
         temp_layer.updateExtents()
 
-        # Add layer to project
+        # Aplicar estilo personalizado se o arquivo existir
+        import os
+        plugin_dir = os.path.dirname(os.path.dirname(__file__))  # volta da pasta map_tools para o diretório do plugin
+        style_path = os.path.join(plugin_dir, "styles", "Draw_Polygon.qml")
+
+        if os.path.exists(style_path):
+            temp_layer.loadNamedStyle(style_path)
+            temp_layer.triggerRepaint()
+        else:
+            from qgis.core import Qgis, QgsMessageLog
+            QgsMessageLog.logMessage(
+                f"Estilo não encontrado: {style_path}. Usando estilo padrão do QGIS.",
+                "GeorefPlugin",
+                level=Qgis.Warning
+            )
+
         QgsProject.instance().addMapLayer(temp_layer)
 
     def clear(self):
