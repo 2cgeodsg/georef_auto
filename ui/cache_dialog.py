@@ -1,9 +1,10 @@
 from math import floor
+
 from PyQt5.QtWidgets import QDialog
+from PyQt5.QtCore import QThread
 from qgis.core import QgsRectangle
 
 from ..utils import logger
-
 from .georef_cache_dialog_base import Ui_GeorefCacheDialog
 from ..service.webmapcache_service import WebMapCacheService
 from ..sources.wms_sources import WMSSource, WMSSources
@@ -24,7 +25,6 @@ class GeorefCacheDialog(QDialog, Ui_GeorefCacheDialog):
         self.setupUi(self)
 
         self.iface = iface
-        self.webmapcache_service = WebMapCacheService()
 
         self.btnCreateCache.clicked.connect(self.create_cache)
 
@@ -78,9 +78,24 @@ class GeorefCacheDialog(QDialog, Ui_GeorefCacheDialog):
     def create_cache(self):
         self.log("--------", 1)
         self.btnCreateCache.setEnabled(False)
-        self.webmapcache_service.setFeedback(self.log, self.progress, self.startProgress)
-        self.webmapcache_service.setMBTilesPath(self.getOutputPath())
-        self.webmapcache_service.setReference(self.getSource())
         self.tabWidget.setCurrentIndex(1)
-        self.webmapcache_service.ensureCache(self.getExtent(), self.getZoomLevel())
+
+        self.thread = QThread()
+        self.wmcs = WebMapCacheService()
+        self.wmcs.setParams(
+            mbtiles_realpath=self.getOutputPath(), 
+            source=self.getSource(), 
+            bounding_box=self.getExtent(), 
+            zoom_level=self.getZoomLevel()
+        )
+        self.wmcs.message_logged.connect(self.log)
+        self.wmcs.progress_pushed.connect(self.progress)
+        self.wmcs.progress_started.connect(self.startProgress)
+
+        self.wmcs.moveToThread(self.thread)
+        self.wmcs.done.connect(self.cache_done)
+        self.thread.started.connect(self.wmcs.run)
+        self.thread.start()
+    
+    def cache_done(self):
         self.btnCreateCache.setEnabled(True)

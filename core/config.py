@@ -17,10 +17,14 @@ class GeoreferencingConfig:
     resampling: str = "cubic"     # "nearest"|"bilinear"|"cubic"
     clamp_upsampling: bool = False
 
-    # Qualidade/aceitação
+    # Qualidade/aceitação (georeferenciamento)
     min_features: int = 8              # recomendado >= 8; 4 é piso teórico
     min_inlier_ratio: float = 0.25     # aceita se inliers >= 25% dos good matches
 
     # Limites de área (proteção operacional)
     max_polygon_area_km2: float = 3050.0   # evita WMS/render pesados
     warn_polygon_area_km2: float = 1500.0  # apenas aviso no log
+
+    # Procura do MI
+    search_division: int = 5
+    search_min_features: int = 1    # mínimo para não descartar a região como possibilidade.

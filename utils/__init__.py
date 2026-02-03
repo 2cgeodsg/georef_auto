@@ -8,6 +8,7 @@ from .qgis_utils import (
     get_qgis_layers,
     is_layer_suitable_for_reference
 )
+from .progress_dialog import ProgressDialog
 
 __all__ = [
     "suppress_low_texture",
@@ -19,4 +20,5 @@ __all__ = [
     "get_qgis_layers",
     "get_area_in_square_km",
     "is_layer_suitable_for_reference",
+    "ProgressDialog"
 ]

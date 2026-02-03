@@ -88,6 +88,39 @@ def is_geographic_crs(epsg_code: str) -> bool:
 #         logging.error(f"Erro no cálculo de área: {e}")
 #         return 0.0
 
+def render(
+    polygon_geom: QgsGeometry,
+    reference_layer,
+    p_log: ProcessLogger,
+    config: GeoreferencingConfig = GeoreferencingConfig(),
+    debug_output_dir: str = "C:/logsgeoref"
+):
+    p_log.start("render_ref")
+    img_ref_crop, bounds_crop, epsg, path_ref_geotiff = render_reference_image(
+        reference_layer,
+        polygon_geom,
+        config=config,
+        debug_output_dir=debug_output_dir
+    )
+    p_log.end("render_ref")
+    if img_ref_crop is None or bounds_crop is None or epsg is None or path_ref_geotiff is None:
+        raise ValueError("Falha ao renderizar a imagem de referência.")
+    
+    if img_ref_crop is None:
+        raise ValueError("Imagem de referência nula retornada do render.")
+
+    if img_ref_crop.ndim != 3 or img_ref_crop.shape[2] != 3:
+        raise ValueError(f"Imagem de referência com formato inesperado: shape={img_ref_crop.shape}")
+
+    if img_ref_crop.dtype != np.uint8:
+        img_ref_crop = img_ref_crop.astype(np.uint8, copy=False)
+
+    # garante buffer próprio e C-contíguo (evita access violation)
+    if (not img_ref_crop.flags['C_CONTIGUOUS']) or (img_ref_crop.base is not None):
+        img_ref_crop = np.ascontiguousarray(img_ref_crop.copy())
+    
+    return img_ref_crop, bounds_crop, epsg, path_ref_geotiff
+
 def georeference_image(
     image_path: str,
     polygon_geom: QgsGeometry,
@@ -117,31 +150,13 @@ def georeference_image(
         # 1) Render da referência (usa config.render_width_px)
         if progress_callback: progress_callback(5, "Renderizando área de referência...")
         p_log.start("render_ref")
-        img_ref_crop, bounds_crop, epsg, path_ref_geotiff = render_reference_image(
-            reference_layer,
+        img_ref_crop, bounds_crop, epsg, path_ref_geotiff = render(
             polygon_geom,
+            reference_layer,
+            p_log,
             config=config,
             debug_output_dir="C:/logsgeoref"
         )
-        p_log.end("render_ref")
-        if img_ref_crop is None or bounds_crop is None or epsg is None or path_ref_geotiff is None:
-            raise ValueError("Falha ao renderizar a imagem de referência.")
-        
-        if img_ref_crop is None:
-            raise ValueError("Imagem de referência nula retornada do render.")
-
-        if img_ref_crop.ndim != 3 or img_ref_crop.shape[2] != 3:
-            raise ValueError(f"Imagem de referência com formato inesperado: shape={img_ref_crop.shape}")
-
-        if img_ref_crop.dtype != np.uint8:
-            img_ref_crop = img_ref_crop.astype(np.uint8, copy=False)
-
-        # garante buffer próprio e C-contíguo (evita access violation)
-        if (not img_ref_crop.flags['C_CONTIGUOUS']) or (img_ref_crop.base is not None):
-            img_ref_crop = np.ascontiguousarray(img_ref_crop.copy())
-
-
-
 
         # 2) Carregar imagem fonte
         if progress_callback: progress_callback(15, "Carregando imagem de entrada...")
