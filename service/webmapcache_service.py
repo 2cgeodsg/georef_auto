@@ -4,20 +4,175 @@ from dataclasses import dataclass
 import os
 from math import floor, pow, pi
 import sqlite3
-import threading
-from typing import Callable
+from time import sleep
+from typing import Callable, Tuple
 import requests
 from osgeo import gdal
 from qgis.core import QgsRectangle
 import base64
-from PyQt5.QtWidgets import QApplication
-from PyQt5.QtCore import QObject, pyqtSignal
-import asyncio
+from PyQt5.QtCore import QObject, pyqtSignal, QThreadPool, QRunnable, pyqtSignal
 
 from ..sources.wms_sources import WMSSource, WMSSourceThreadsafe, WMSSources
 
 
-class WebMapCacheService(QObject):
+@dataclass(frozen=True)
+class TileParams:
+    tile: tuple[int, int, int]
+    tilepath: str
+    source: WMSSourceThreadsafe
+    requestBuilder: Callable[[str, int, int, int], str]
+
+
+@dataclass(frozen=True)
+class TileResults:
+    tile: tuple[int, int, int]
+    ok: bool
+
+
+class TileWorkerSignals(QObject):
+    result = pyqtSignal(TileResults)
+    logs = pyqtSignal(TileParams,list[Tuple[str, int]])
+
+
+class TileWorkerContext:
+    conn: sqlite3.Connection|None = None
+    logs: list[Tuple[str,int]] = []
+    ok: bool = False
+
+    def __init__(self, params: TileParams, signals: TileWorkerSignals):
+        self.params = params
+        self.signals = signals
+    
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        try:
+            if self.conn:
+                self.log("Fechando conexão com MBTiles", 1)
+                self.conn.close()
+                self.log("- Conexão com MBTiles fechada", 1)
+        except:
+            self.log("- Falhou ao fechar a conexão MBTiles", 2)
+        try:
+            self.log("Emitindo resultados", 1)
+            self.signals.result.emit(TileResults(tile=self.params.tile, ok=self.ok))
+            self.log("- Resultados emitidos", 1)
+        except:
+            self.log("- Falhou em emitir os resultados", 3)
+        self.signals.logs.emit(self.params, self.logs)
+        return True
+    
+    def log(self, msg:str, level:int):
+        self.logs.append((msg,level))
+
+
+class TileWorker(QRunnable):
+    def __init__(self, params: TileParams, signals: TileWorkerSignals):
+        super().__init__()
+        self.signals = signals
+        self.params = params
+        self.canceled = False
+
+    def run(self):
+        tile = self.params.tile
+        source = self.params.source
+        requestBuilder = self.params.requestBuilder
+        with TileWorkerContext(self.params, self.signals) as context:
+            # Verifica se cancelado
+            if self.canceled:
+                context.log(f"Cancelado, encerrando.", 1)
+                return
+            # Se não há template_url, some daqui.
+            if not source.template_url:
+                context.log(f"Nenhum URL informado, encerrando.", 1)
+                return
+            
+            # Abre conexão com o MBtiles
+            context.log("Tentando abrir conexão com MBTiles", 1)
+            context.log("- Conexão aberta com sucesso", 1)
+            context.conn = sqlite3.connect(self.tilepath)
+            cursor = context.conn.cursor()
+            # Verifica existência
+            context.log("Verificando se o tile já existe", 1)
+            try:
+                query = "SELECT tile_data FROM tiles WHERE zoom_level = ? AND tile_column = ? AND tile_row = ?"
+                cursor.execute(query, (tile[0], tile[1], (1 << tile[0]) - 1 - tile[2]))
+                # cursor.execute(query, (tile[0], tile[1], tile[2]))
+                # Fetch one result. If a row is found, the tile exists.
+                result = cursor.fetchone()
+                if result is not None:
+                    # Já tem o tile
+                    context.log("- Tile encontrado, encerrando.", 1)
+                    context.ok = True
+                    return
+            except Exception as e:
+                context.log("Não pode ler/escrever no MBTiles", 3)
+                return
+
+                
+            # Request do tile
+            response = None
+            url = requestBuilder(source.template_url, tile[0], tile[1], tile[2])
+            context.log(f"Fazendo pedido de: {url}", 1)
+            # 3 tentativas de baixar o tile
+            for _ in range(3):
+                if self.canceled:
+                    context.log("Cancelado", 1)
+                    return
+                try:
+                    response = requests.get(url, allow_redirects=True)
+                except:
+                    response = None
+                valid = TileWorker.isValidTile(response)
+                if valid[0]:
+                    context.log(f"- Baixado com sucesso.", 1)
+                    break
+                response = None
+                #logger.warning(f"Tile {tile[0]}/{tile[1]}/{tile[2]} falhou: {valid[1]}. Tentando denovo...")
+                context.log(f"- Falhou: {valid[1]}. Tentando denovo...", 2)
+            if not response:
+                #logger.error(f"Tile {tile[0]}/{tile[1]}/{tile[2]} não pode ser baixado!")
+                context.log("- Não pode ser baixado!", 3)
+                return
+            # Se conseguir, tá aí.
+            tile_data = response.content
+            # Insere tile
+            total_storage_attempts = 3
+            for attempt in range(total_storage_attempts):
+                if self.canceled:
+                    context.log("Cancelado", 1)
+                    return
+                try:
+                    cursor.execute(
+                        "INSERT INTO tiles (zoom_level, tile_column, tile_row, tile_data) VALUES (?, ?, ?, ?)",
+                        (tile[0], tile[1], (1 << tile[0]) - 1 - tile[2], sqlite3.Binary(tile_data)) # y do TMS não ZYX
+                        # (tile[0], tile[1], tile[2], sqlite3.Binary(tile_data))
+                    )
+                    context.conn.commit()
+                    context.ok
+                    context.log("Tile armazenado no MBTiles.", 1)
+                except Exception as e:
+                    context.log(f"- {attempt}/{total_storage_attempts} Erro ao armazenar: {e}.", 3)
+            return
+    
+    @staticmethod
+    def isValidTile(response: requests.Response|None) -> tuple[bool, str]:
+        if not response: return False, "Sem resposta"
+        if response.status_code != 200: return False, "Request não OK"
+        if not response.headers["content-type"].startswith("image"): return False, "Não imagem"
+        if not isinstance(response.content, bytes): return False, "Vazio"
+        try:
+            isXml = base64.b64decode(response.content).decode().startswith("<xml")
+            if isXml: return False, "XML disfarçado de imagem"
+        except:
+            return True, ""
+        return True, ""
+
+
+
+
+class WebMapCacheService(QObject): 
     """
     Serviço de alto nível para download e cache de WMS.
     
@@ -29,32 +184,33 @@ class WebMapCacheService(QObject):
     wmcs.ensureCache(extent, res_espacial) # Constrói persistentemente o cache da camada (tenta muitas vezes)
     ```
     """
-    
 
     max_simultaneous_requests = 8
     mbtiles_driver = gdal.GetDriverByName("MBTiles")
     source = WMSSource(WMSSources.list_sources()[0])
     __mbtiles_cache_path = os.path.realpath("../cache")
-    message_logged = pyqtSignal(str, int)
-    progress_pushed = pyqtSignal()
-    progress_started = pyqtSignal(int)
+    message = pyqtSignal(str, int)
+    progressed = pyqtSignal()
+    started = pyqtSignal(int)
     done = pyqtSignal()
     
     def __init__(self) -> None:
         super().__init__()
-        self.wasCanceled = lambda: False
+        self.threadpool: QThreadPool|None = None
+        self.results: list[TileResults] = []
+        self.active_workers: list[TileWorker] = []
+        self.canceled = False
+        self.busy = False
     
     def getMBTilesPath(self):
         return os.path.realpath(os.path.join(self.__mbtiles_cache_path, f"{self.source.source_id}.mbtiles"))
     
-    def setParams(self, mbtiles_realpath, source: WMSSource, bounding_box: QgsRectangle, zoom_level: int):
+    def setParams(self, mbtiles_realpath, source: WMSSource, bounding_box: QgsRectangle, zoom_level: int, log_path: str|None = None):
         self.__mbtiles_cache_path = mbtiles_realpath
         self.source = source
         self.bbox = bounding_box
         self.z = zoom_level
-    
-    def setCanceled(self, wasCanceled: Callable[[], bool]):
-        self.wasCanceled = wasCanceled
+        self.log_path = log_path
 
     @staticmethod
     def degToRad(deg: float): return deg * pi / 180
@@ -98,216 +254,144 @@ class WebMapCacheService(QObject):
     @staticmethod
     def buildRequestUrl(templateUrl: str, Z: int, X: int, Y: int):
         return templateUrl.format(z=Z, x=X, y=Y, q=WebMapCacheService.queryFromZYX(Z,Y,X))
+    
+    def start(self):
+        """Dá inicio a execução dos processos, retorna True se teve sucesos e False caso contrário"""
+        if self.busy: return False
+        self.active_workers.clear()
+        self.results.clear()
+        if not self.__setup_processes():
+            return False
+        self.__start_processes()
+        return True
+    
+    def cancel(self):
+        self.canceled = True
+        if not self.threadpool: return
+        self.threadpool.clear()
+        if not self.active_workers: return
+        for worker in self.active_workers:
+            if not worker: continue
+            worker.canceled = True
 
-    def run(self):
+    def __setup_processes(self):
         # Calcula os tiles necessários
-        self.message_logged.emit(f"Calculando cobertura para {self.bbox.xMinimum()} {self.bbox.yMinimum()} ; {self.bbox.xMaximum()} {self.bbox.yMaximum()}", 1)
+        self.message.emit(f"Calculando cobertura para {self.bbox.xMinimum()} {self.bbox.yMinimum()} ; {self.bbox.xMaximum()} {self.bbox.yMaximum()}", 1)
         minX, minY, maxX, maxY = self.calculateTileCoverage(self.bbox, self.z)
         
-        self.message_logged.emit(f"--Calculado: {self.z}/[{minX}, {maxX}]/[{minY}, {maxY}].", 1)
-        tiles = [(self.z,x,y) for x in range(minX, maxX+1) for y in range(minY, maxY+1)]
-        total = len(tiles)
+        self.message.emit(f"- Calculado: {self.z}/[{minX}, {maxX}]/[{minY}, {maxY}].", 1)
+        self.tiles = [(self.z,x,y) for x in range(minX, maxX+1) for y in range(minY, maxY+1)]
+        self.total = len(self.tiles)
 
         # Cria o cache se não existir
-        self.message_logged.emit("Verificando existencia do arquivo de cache.", 1)
+        self.message.emit("Verificando existencia do arquivo de cache.", 1)
         if self.mbtiles_driver is None:
-            self.message_logged.emit("Driver de MBTiles indisponível. Garanta que o GDAL foi buildado com suporte SQLite.", 3)
-            self.done.emit()
-            return
+            self.message.emit("Driver de MBTiles indisponível. Garanta que o GDAL foi buildado com suporte SQLite.", 3)
+            return False
         if not os.path.exists(self.getMBTilesPath()):
-            self.message_logged.emit("Arquivo de cache não encontrado. Criando um...", 1)
-            if not self.createMBTilesSkeleton(self.source.alias, f"cache of {self.source}"):
-                self.message_logged.emit(f"--Não pode criar MBTiles em {self.getMBTilesPath()}", 3)
-                self.done.emit()
-                return
-            self.message_logged.emit("--Criado com sucesso.", 1)
+            self.message.emit("Arquivo de cache não encontrado. Criando um...", 1)
+            if not self.createMBTilesSkeleton(self.source.alias, f"cache of {self.source}", self.getMBTilesPath()):
+                self.message.emit(f"- Não pode criar MBTiles em {self.getMBTilesPath()}", 3)
+                return False
+            self.message.emit("- Criado com sucesso.", 1)
     
-        # Prepara para preencher o cache
-        self.message_logged.emit("Preparando para preencher o cache.", 1)
-        todos_tiles_prontos = False
-        event_loop = asyncio.new_event_loop()
-        def start_loop(loop):
-            asyncio.set_event_loop(loop)
-            loop.run_forever()
-        t = threading.Thread(target=start_loop, args=(event_loop,), daemon=True)
-        t.start()
+        # Prepara threadpool
+        self.message.emit("Criando threadpool.", 1)
+        self.threadpool = QThreadPool()
+        if self.threadpool: 
+            self.message.emit("- Limitando requests simultâneos.", 1)
+            self.threadpool.setMaxThreadCount(self.max_simultaneous_requests)
+        else:
+            self.message.emit("- Falhou ao criar threadpool.", 3)
 
-        # Preenche
-        self.message_logged.emit("Preenchendo tiles paralelamente.", 1)
-        while not todos_tiles_prontos:
-            self.progress_started.emit(total)
-            params = [WebMapCacheService.TileParams(
+
+        # Prepara os logs
+        if self.log_path:
+            header_lines = []
+            header_lines.append("============ WEBMAPCACHE SERVICE LOGS ============")
+            header_lines.append(f"BOUNDING BOX : {self.bbox.toString(6)}")
+            header_lines.append(f"TILE RANGE : {self.z} | {minX} to {maxX} | {minY} to {maxY}")
+            header_lines.append(f"CACHE PATH : {self.getMBTilesPath()}")
+            header_lines.append("SOURCE : ")
+            for l in self.source.toStrings():
+                header_lines.append(f"        {l}")
+            header_lines.append("=================== TILE LOGS ===================")
+            header_lines.append("")
+            self.__write_log(header_lines)
+        return True
+    
+    def __start_processes(self):
+        assert self.threadpool
+        self.message.emit("Preenchendo tiles paralelamente.", 1)
+        if self.canceled:
+            return
+
+        self.started.emit(self.total)
+        self.message.emit("--Construindo lista de parâmetros.", 1)
+        try:
+            list_of_params = [TileParams(
                 tile=t, 
                 tilepath=self.getMBTilesPath(),
                 source=WMSSourceThreadsafe(self.source),
-                requestBuilder=self.buildRequestUrl,
-                tileChecker=self.isValidTile
-            ) for t in tiles]
-            
-            futuros_resultados = asyncio.run_coroutine_threadsafe(
-                WebMapCacheService.ensureTilesInParallel(
-                    params, 
-                    self.max_simultaneous_requests, 
-                    self.wasCanceled,
-                    self.message_logged.emit, 
-                    self.progress_pushed.emit
-                ), 
-                event_loop
-            )
-            #logger.info("Verificando que todos os tiles baixaram.")
-            while not futuros_resultados.done():
-                pass
-            resultados = futuros_resultados.result()
-            if self.wasCanceled():
-                break
-            self.message_logged.emit("Verificando que todos os tiles baixaram.", 1)
-            todos_tiles_prontos = all(resultados)
-            if not todos_tiles_prontos:
-                self.message_logged.emit(f"Há {resultados.count(False)} tiles que falharam. Tentando novamente.", 1)
-        self.message_logged.emit("Cache do WMS concluído com êxito.", 1)
-        self.done.emit()
-        return
-    
-    @dataclass
-    class TileParams:
-        tile: tuple[int, int, int]
-        tilepath: str
-        source: WMSSourceThreadsafe
-        requestBuilder: Callable[[str, int, int, int], str]
-        tileChecker: Callable[[requests.Response|None], tuple[bool, str]]
-
-    @staticmethod
-    async def ensureTilesInParallel(
-        paramList: list[TileParams], 
-        request_max_rate: int, 
-        wasCanceled: Callable[[],bool],
-        pushLog: Callable[[str,int],None], 
-        pushProgress: Callable[[],None]
-    ):
-        req_sem = asyncio.Semaphore(request_max_rate)
-        tasks = [asyncio.create_task(WebMapCacheService.ensureTile(p, req_sem, wasCanceled, pushLog, pushProgress)) for p in paramList]
-        result = await asyncio.gather(*tasks)
-        return result
-
-    @staticmethod
-    async def ensureTile(
-        params: TileParams, 
-        request_semaphore, 
-        wasCanceled: Callable[[],bool],
-        pushLog: Callable[[str,int],None], 
-        pushProgress: Callable[[],None]
-    ) -> bool:
-        tile = params.tile
-        if wasCanceled():
-            pushLog(f"--Tile {tile[0]}/{tile[1]}/{tile[2]} cancelado", 1)
-            return False
-        tilepath = params.tilepath
-        source = params.source
-        requestBuilder = params.requestBuilder
-        tileChecker = params.tileChecker
-        # Abre conexão com o MBtiles e preprara a saida
-        conn = sqlite3.connect(tilepath)
-        cursor = conn.cursor()
-        def _exit(t: bool):
-            pushProgress()
-            conn.close()
-            return t
-        # Se não há template_url, some daqui.
-        if not source.template_url:
-            return _exit(False)
-
-        try:
-            query = "SELECT tile_data FROM tiles WHERE zoom_level = ? AND tile_column = ? AND tile_row = ?"
-            cursor.execute(query, (tile[0], tile[1], (1 << tile[0]) - 1 - tile[2]))
-            # cursor.execute(query, (tile[0], tile[1], tile[2]))
-            # Fetch one result. If a row is found, the tile exists.
-            result = cursor.fetchone()
-            if result is not None:
-                # Já tem o tile
-                return _exit(True)
+                requestBuilder=self.buildRequestUrl
+            ) for t in self.tiles]
         except Exception as e:
-            pushLog("--Não pode ler/escrever no MBTiles", 3)
-            return _exit(False)
+            self.message.emit(f"{e}", 3)
+            return
 
+
+        self.results = []
+        self.active_workers = []
         
-        # Request do tile
-        # QApplication.processEvents()
-        response = None
-        # 3 tentativas de baixar o tile
-        url = requestBuilder(source.template_url, tile[0], tile[1], tile[2])
-        pushLog(f"--Tile {tile[0]}/{tile[1]}/{tile[2]} sendo pedido de: {url}", 1)
-        async with request_semaphore:
-            for _ in range(3):
-                if wasCanceled():
-                    pushLog(f"--Tile {tile[0]}/{tile[1]}/{tile[2]} download cancelado", 1)
-                    return _exit(False)
-                # QApplication.processEvents()
-                try:
-                    response = requests.get(url, allow_redirects=True)
-                except:
-                    response = None
-                valid = tileChecker(response)
-                if valid[0]:
-                    #logger.info(f"Tile {tile[0]}/{tile[1]}/{tile[2]} baixado com sucesso.")
-                    pushLog(f"--Tile {tile[0]}/{tile[1]}/{tile[2]} baixado com sucesso.", 1)
-                    break
-                response = None
-                #logger.warning(f"Tile {tile[0]}/{tile[1]}/{tile[2]} falhou: {valid[1]}. Tentando denovo...")
-                pushLog(f"----Tile {tile[0]}/{tile[1]}/{tile[2]} falhou: {valid[1]}. Tentando denovo...", 2)
-        if not response:
-            #logger.error(f"Tile {tile[0]}/{tile[1]}/{tile[2]} não pode ser baixado!")
-            pushLog(f"--Tile {tile[0]}/{tile[1]}/{tile[2]} não pode ser baixado!", 3)
-            return _exit(False)
-        # Se conseguir, tá aí.
-        tile_data = response.content
-        tile_inserted = False
-        # Insere tile
-        # QApplication.processEvents()
-        for _ in range(3):
-            if wasCanceled():
-                pushLog(f"--Tile {tile[0]}/{tile[1]}/{tile[2]} escrita cancelada", 1)
-                return _exit(False)
-            try:
-                cursor.execute(
-                    "INSERT INTO tiles (zoom_level, tile_column, tile_row, tile_data) VALUES (?, ?, ?, ?)",
-                    (tile[0], tile[1], (1 << tile[0]) - 1 - tile[2], sqlite3.Binary(tile_data)) # y do TMS não ZYX
-                    # (tile[0], tile[1], tile[2], sqlite3.Binary(tile_data))
-                )
-                conn.commit()
-                tile_inserted = True
-            except sqlite3.Error as e:
-                #logger.exception(e)
-                pushLog(f"--Tile {tile[0]}/{tile[1]}/{tile[2]} não pode ser armazenado! {e}.", 3)
-            except Exception as e:
-                pushLog(f"--Tile {tile[0]}/{tile[1]}/{tile[2]} gerou um erro ao inserir: {e}.", 3)
-            if tile_inserted:
-                #logger.info(f"Tile {tile[0]}/{tile[1]}/{tile[2]} armazenado no MBTiles.")
-                pushLog(f"Tile {tile[0]}/{tile[1]}/{tile[2]} armazenado no MBTiles.", 1)
-                break
-            # QApplication.processEvents()
-        return _exit(tile_inserted)
+        self.message.emit("--Delegando tarefas a worker threads.", 1)
+        for params in list_of_params:
+            if self.canceled:
+                return
+            signals = TileWorkerSignals()
+            signals.result.connect(self.__gather_results)
+            signals.logs.connect(self.__write_tile_logs)
+            worker = TileWorker(params=params, signals=signals)
+            self.active_workers.append(worker)
+            self.threadpool.start(worker)
     
+    def __check_results(self):
+        self.message.emit("Verificando que todos os tiles baixaram.", 1)
+        todos_ok = all([r.ok for r in self.results])
+        if not todos_ok:
+            nao_ok = [r.tile for r in self.results if not r.ok]
+            self.message.emit(f"Há {len(nao_ok)} tiles que falharam. Tentando novamente.", 1)
+            self.__start_processes()
+            return
+        self.message.emit("Cache do WMS concluído com êxito.", 1)
+        self.threadpool = None
+        self.busy = False
+        self.done.emit()
+
+    def __gather_results(self, result: TileResults):
+        if not self.results: return
+        self.results.append(result)
+        if len(self.results) == self.total:
+            self.__check_results()
+    
+    def __write_log(self, log: list[str]):
+        if not self.log_path: return
+        with open(self.log_path, "a") as f:
+            for l in log:
+                f.write(l)
+                f.write("\n") # If lines skipping, remove
+    
+    def __write_tile_logs(self, params: TileParams, logs: list[Tuple[str, int]]):
+        self.__write_log([f"TILE : {params.tile}"] + [f"{        l[0]}" for l in logs])
+    
+
     @staticmethod
-    def isValidTile(response: requests.Response|None) -> tuple[bool, str]:
-        if not response: return False, "Sem resposta"
-        if response.status_code != 200: return False, "Request não OK"
-        if not response.headers["content-type"].startswith("image"): return False, "Não imagem"
-        if not isinstance(response.content, bytes): return False, "Vazio"
-        try:
-            isXml = base64.b64decode(response.content).decode().startswith("<xml")
-            if isXml: return False, "XML disfarçado de imagem"
-        except:
-            return True, ""
-        return True, ""
-    
-    def createMBTilesSkeleton(self, name, description):
+    def createMBTilesSkeleton(name, description, filepath):
         """Creates the basic structure and metadata for an MBTiles file using GDAL."""
-        mbtiles_path = self.getMBTilesPath()
         # GDAL will create the file and the necessary tables/metadata
         driver = gdal.GetDriverByName("MBTiles")
         # Using 'w' mode for creation/overwrite
         ds = driver.Create(
-            mbtiles_path, 
+            filepath, 
             256, 256, 3, 
             gdal.GDT_Byte, 
             options=[

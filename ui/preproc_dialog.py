@@ -188,6 +188,7 @@ class GeorefPreprocDialog(QDialog, Ui_GeorefPreprocDialog):
         self.progress_dlg.setPrimaryTotal(0)
         self.progress_dlg.setSecondaryTotal(0)
         self.progress_dlg.setTertiaryTotal(0)
+        QCoreApplication.processEvents()
         # Move object to thread and connect signals (SE TROCAR A ORDEM VAI CONGELAR A INTERFACE!)
         self.mgs.moveToThread(self.thread)
         self.mgs.connectProgressDialog(self.progress_dlg)

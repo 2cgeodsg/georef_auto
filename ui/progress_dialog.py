@@ -21,10 +21,10 @@ class GeorefProgressDialog(QDialog, Ui_GeorefProgressDialog):
 
     def setPrimaryProgress(self, curr: int):
         self.primaryCurr = curr
-        self.progressBarPrimary.setValue(round(100.0 * self.primaryCurr / self.primaryTotal) if self.primaryTotal != 0 else -1)
+        self.progressBarPrimary.setValue(self.primaryCurr)
     
     def setPrimaryTotal(self, total: int):
-        self.primaryTotal = total
+        self.progressBarPrimary.setMaximum(total)
         self.setPrimaryProgress(0)
     
     def pushPrimaryProgress(self):
@@ -35,10 +35,10 @@ class GeorefProgressDialog(QDialog, Ui_GeorefProgressDialog):
 
     def setSecondaryProgress(self, curr: int):
         self.secondaryCurr = curr
-        self.progressBarSecondary.setValue(round(100.0 * self.secondaryCurr / self.secondaryTotal) if self.secondaryTotal != 0 else -1)
+        self.progressBarSecondary.setValue(self.secondaryCurr)
     
     def setSecondaryTotal(self, total: int):
-        self.secondaryTotal = total
+        self.progressBarSecondary.setMaximum(total)
         self.setSecondaryProgress(0)
     
     def pushSecondaryProgress(self):
@@ -49,10 +49,10 @@ class GeorefProgressDialog(QDialog, Ui_GeorefProgressDialog):
 
     def setTertiaryProgress(self, curr: int):
         self.tertiaryCurr = curr
-        self.progressBarTertiary.setValue(round(100.0 * self.tertiaryCurr / self.tertiaryTotal) if self.tertiaryTotal != 0 else -1)
+        self.progressBarTertiary.setValue(self.tertiaryCurr)
     
     def setTertiaryTotal(self, total: int):
-        self.tertiaryTotal = total
+        self.progressBarTertiary.setMaximum(total)
         self.setTertiaryProgress(0)
     
     def pushTertiaryProgress(self):
@@ -70,6 +70,9 @@ class GeorefProgressDialog(QDialog, Ui_GeorefProgressDialog):
         self.__canceled = True
         self.setBarsVisible(False)
         self.setDescription(QCoreApplication.translate("GeorefProgressDialog", u"Canceling...", None))
+    
+    def canceled(self):
+        return self.btnCancel.clicked
     
     def wasCanceled(self):
         return self.__canceled

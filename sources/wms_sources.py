@@ -46,6 +46,16 @@ class WMSSource:
             return
         self.min_zoom = self.metadata.get("tms", "zmin", fallback=0)
         self.max_zoom = self.metadata.get("tms", "zmax", fallback=20)
+    
+    def toStrings(self) -> list[str]:
+        return [
+            f"{self.source_id} | {self.alias}",
+            f"PATH : {self.source_path}",
+            f"URL  : {self.template_url}",
+            f"ICON : {self.icon_filename}",
+            f"MINZ : {self.min_zoom}",
+            f"MAXZ : {self.max_zoom}"
+        ]
 
 class WMSSourceThreadsafe:
     def __init__(self, source: WMSSource) -> None:

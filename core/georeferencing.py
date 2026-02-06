@@ -91,18 +91,18 @@ def is_geographic_crs(epsg_code: str) -> bool:
 def render(
     polygon_geom: QgsGeometry,
     reference_layer,
-    p_log: ProcessLogger,
+    p_log: ProcessLogger|None=None,
     config: GeoreferencingConfig = GeoreferencingConfig(),
     debug_output_dir: str = "C:/logsgeoref"
 ):
-    p_log.start("render_ref")
+    if p_log: p_log.start("render_ref")
     img_ref_crop, bounds_crop, epsg, path_ref_geotiff = render_reference_image(
         reference_layer,
         polygon_geom,
         config=config,
         debug_output_dir=debug_output_dir
     )
-    p_log.end("render_ref")
+    if p_log: p_log.end("render_ref")
     if img_ref_crop is None or bounds_crop is None or epsg is None or path_ref_geotiff is None:
         raise ValueError("Falha ao renderizar a imagem de referência.")
     

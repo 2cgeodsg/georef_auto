@@ -41,25 +41,15 @@ def isPossibleLocation(
     Pipeline: render → detectar → match → retornar.
     Todos os parâmetros operacionais vêm de `config`. 
     """
-    p_log = ProcessLogger(log_directory=log_dir)
-    p_log.attach_python_logging(level=logging.INFO)
-    p_log.set_context(
-        image=os.path.basename(image_path),
-        epsg_ref=str(reference_layer.crs().authid()) if hasattr(reference_layer, "crs") else "desconhecido",
-        opencv_version=cv2.__version__,
-        rasterio_version=getattr(rasterio, "__version__", "unknown"),
-        cfg=vars(config),
-    )
 
     if wasCanceled and wasCanceled(): return False
 
     # 1) Render da referência (usa config.render_width_px)
     if progress_callback: progress_callback(10, "Renderizando área de referência...")
-    p_log.start("render_ref")
     img_ref_crop, bounds_crop, epsg, path_ref_geotiff = render(
         polygon_geom,
         reference_layer,
-        p_log,
+        None,
         config=config,
         debug_output_dir=log_dir
     )
@@ -69,18 +59,15 @@ def isPossibleLocation(
     
     # 2) Carregar imagem fonte
     if progress_callback: progress_callback(20, "Carregando imagem de entrada...")
-    img_original_gray = carregarImagem(image_path, p_log=p_log)
+    img_original_gray = carregarImagem(image_path)
 
     if wasCanceled and wasCanceled(): return False
 
     # 4) Detectar/Descrever
     if progress_callback: progress_callback(40, "Detectando características (RootSIFT)...")
-    p_log.start("detect_describe")
     detector = RootSIFTDetector()
     kp1, desc1 = detector.detect_and_compute(img_original_gray)
     kp2, desc2 = detector.detect_and_compute(img_ref_gray)
-    p_log.end("detect_describe")
-    p_log.log_kv(kp_src=len(kp1 or []), kp_ref=len(kp2 or []), detector="RootSIFT")
 
     if desc1 is None or desc2 is None or len(kp1) < config.min_features or len(kp2) < config.min_features:
         raise ValueError(f"Descritores insuficientes: kp_src={len(kp1 or [])}, kp_ref={len(kp2 or [])}, "
@@ -90,14 +77,11 @@ def isPossibleLocation(
 
     # 5) Matching
     if progress_callback: progress_callback(80, "Correspondendo características (FLANN)...")
-    p_log.start("matching")
     matcher = FLANNMatcher()
     desc_type = detector.descriptor_type
     desc1 = desc1.astype(desc_type)
     desc2 = desc2.astype(desc_type)
     good_matches, raw_matches = matcher.match(desc1, desc2, kp1, kp2)
-    p_log.end("matching")
-    p_log.log_kv(matches_raw=len(raw_matches), matches_good=len(good_matches), matcher="FLANN")
 
     if wasCanceled and wasCanceled(): return False
 
