@@ -102,12 +102,12 @@ class MIGuessingService(QObject):
         """Essa função dá inicio ao processo de cache"""
         self.secondary_label.emit("Setting up WMS Cache Service.")
         self.wmcs = WebMapCacheService()
+        self.wmcs.setParams(cache_folder, source, extent, zoom)
         self.wmcs.message.connect(self.tertiary_label.emit)
         self.wmcs.started.connect(self.tertiary_total.emit)
         self.wmcs.progressed.connect(self.tertiary_progress_pushed.emit)
         self.wmcs.done.connect(self.onCacheDone)
         self.cancel.connect(self.wmcs.cancel)
-        self.wmcs.setParams(cache_folder, source, extent, zoom)
         self.secondary_label.emit("Cacheing WMS Layer...")
         return self.wmcs.start()
     

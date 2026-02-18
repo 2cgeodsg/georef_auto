@@ -1,7 +1,7 @@
 from math import floor
 
 from PyQt5.QtWidgets import QDialog
-from PyQt5.QtCore import QThread
+from PyQt5.QtCore import QThread, pyqtSlot
 from qgis.core import QgsRectangle
 
 from ..utils import logger
@@ -47,6 +47,7 @@ class GeorefCacheDialog(QDialog, Ui_GeorefCacheDialog):
         super().show()
         self.textBrowserLog.clear()
 
+    @pyqtSlot(str, int)
     def log(self, message, level: int = 1):
         color = self.FEEDBACK_COLORS[level]
         line = self.FEEDBACK_LINE_TEMPLATE.format(color, message)
@@ -54,13 +55,18 @@ class GeorefCacheDialog(QDialog, Ui_GeorefCacheDialog):
         # self.textBrowserLog.insertPlainText(message)
         logger.logger.info(message)
     
+    @pyqtSlot()
     def progress(self):
+        self.log(f"Progress pushed", 1)
         self.current += 1
         self.progressBar.setValue(self.current)
     
+    @pyqtSlot(int)
     def startProgress(self, total: int):
+        self.log(f"Progress started with {total}", 1)
         self.progressBar.setMinimum(0)
         self.progressBar.setMaximum(total)
+        self.progressBar.setValue(0)
         self.current = 0
     
     def getExtent(self) -> QgsRectangle:
@@ -82,20 +88,24 @@ class GeorefCacheDialog(QDialog, Ui_GeorefCacheDialog):
 
         self.thread = QThread()
         self.wmcs = WebMapCacheService()
+        self.wmcs.moveToThread(self.thread)
+
         self.wmcs.setParams(
             mbtiles_realpath=self.getOutputPath(), 
             source=self.getSource(), 
             bounding_box=self.getExtent(), 
-            zoom_level=self.getZoomLevel()
+            zoom_level=self.getZoomLevel(),
+            log_path="C:/logsgeoref/webmapcache.log"
         )
-        self.wmcs.message_logged.connect(self.log)
-        self.wmcs.progress_pushed.connect(self.progress)
-        self.wmcs.progress_started.connect(self.startProgress)
-
-        self.wmcs.moveToThread(self.thread)
+        self.wmcs.message.connect(self.log)
+        self.wmcs.progressed.connect(self.progress)
+        self.wmcs.started.connect(self.startProgress)
         self.wmcs.done.connect(self.cache_done)
-        self.thread.started.connect(self.wmcs.run)
+
+        self.thread.started.connect(self.wmcs.start)
         self.thread.start()
     
+    @pyqtSlot()
     def cache_done(self):
+        self.log(f"Cache done!", 1)
         self.btnCreateCache.setEnabled(True)
