@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 from __future__ import annotations
 from typing import Optional, Tuple
-import numpy as np
-import cv2
+from ...dependencies import numpy as np
+from ...dependencies import cv2
 
 def _homografia_valida(H: np.ndarray) -> bool:
     """Valida se H é 3x3, finita e não degenerada."""

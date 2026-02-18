@@ -1,7 +1,7 @@
 from __future__ import annotations
 from typing import Sequence, Tuple
-import numpy as np
-import cv2
+from ...dependencies import numpy as np
+from ...dependencies import cv2
 import logging
 
 from .homography_base import (

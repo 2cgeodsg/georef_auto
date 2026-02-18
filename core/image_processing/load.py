@@ -1,5 +1,5 @@
-import cv2
-import numpy as np
+from ...dependencies import cv2
+from ...dependencies import numpy as np
 from typing import Optional
 from ...utils.logger import logger
 

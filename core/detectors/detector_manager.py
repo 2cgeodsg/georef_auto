@@ -1,5 +1,5 @@
 from typing import Tuple, List, Optional
-import numpy as np
+from ...dependencies import numpy as np
 from .detectors import ORBDetector, RootSIFTDetector, AKAZEDetector
 from ..utils.logger import logger
 from .base_detector import BaseDetector

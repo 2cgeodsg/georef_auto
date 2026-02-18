@@ -18,8 +18,8 @@ from typing import Iterable, List, Optional, Tuple
 import os
 import shutil
 import gc
-import cv2
-import numpy as np
+from ...dependencies import cv2
+from ...dependencies import numpy as np
 
 from .config import MosaicConfig
 from ...utils.logger import logger

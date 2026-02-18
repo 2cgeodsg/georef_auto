@@ -1,6 +1,6 @@
 from typing import List, Tuple
-import cv2
-import numpy as np
+from ...dependencies import cv2
+from ...dependencies import numpy as np
 from .base_matcher import BaseMatcher
 from ...utils.logger import logger
 

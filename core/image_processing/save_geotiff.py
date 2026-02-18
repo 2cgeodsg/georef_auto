@@ -5,8 +5,8 @@ import os
 from dataclasses import dataclass
 from typing import Literal, Tuple, Optional
 
-import numpy as np
-import rasterio
+from ...dependencies import numpy as np
+from ...dependencies import rasterio
 import rasterio.transform
 from rasterio.warp import reproject, Resampling
 

@@ -1,5 +1,5 @@
-import numpy as np
-import cv2
+from ..dependencies import numpy as np
+from ..dependencies import cv2
 
 def reprojection_stats(H, pares, mask):
     pts_src = np.float32([[p.origem.x, p.origem.y] for p in pares]).reshape(-1,1,2)

@@ -1,8 +1,8 @@
 from __future__ import annotations
 from dataclasses import dataclass
 from typing import Protocol, Sequence, Tuple, Optional
-import numpy as np
-import cv2
+from ...dependencies import numpy as np
+from ...dependencies import cv2
 
 @dataclass(frozen=True)
 class Ponto2D:

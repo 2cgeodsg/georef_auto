@@ -10,7 +10,7 @@ from qgis.PyQt.QtCore import QSize, Qt
 from qgis.PyQt.QtGui import QImage, QPainter, QColor, QPixmap
 import os
 import logging
-import numpy as np
+from ..dependencies import numpy as np
 
 from .logger import logger
 

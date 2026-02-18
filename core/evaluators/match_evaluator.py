@@ -1,5 +1,5 @@
-import numpy as np
-import cv2
+from ...dependencies import numpy as np
+from ...dependencies import cv2
 from typing import List, Tuple
 from ...utils.logger import logger
 

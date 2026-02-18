@@ -22,7 +22,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Optional, Tuple, Protocol
 import math
-import numpy as np
+from ...dependencies import numpy as np
 
 try:
     import psutil  # opcional, para RAM livre

@@ -2,10 +2,10 @@ import logging
 import os
 from typing import Callable, Tuple
 
-from cv2.gapi import div
-import rasterio
+from ..dependencies import rasterio
 
-import cv2
+from ..dependencies import cv2
+from cv2.gapi import div
 
 from qgis.core import QgsGeometry, QgsRectangle
 

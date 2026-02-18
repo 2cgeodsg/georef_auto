@@ -10,13 +10,14 @@ import requests
 from osgeo import gdal
 from qgis.core import QgsRectangle
 import base64
-from PyQt5.QtCore import QObject, pyqtSignal, QThreadPool, QRunnable, pyqtSignal
+from PyQt5.QtCore import QObject, pyqtSignal, QThreadPool, QRunnable, pyqtSlot
 
 from ..sources.wms_sources import WMSSource, WMSSourceThreadsafe, WMSSources
 
 
 @dataclass(frozen=True)
 class TileParams:
+    """Parâmetros do tile. Quem, onde, como."""
     tile: tuple[int, int, int]
     tilepath: str
     source: WMSSourceThreadsafe
@@ -26,27 +27,46 @@ class TileParams:
 @dataclass(frozen=True)
 class TileResults:
     tile: tuple[int, int, int]
-    ok: bool
+    success: bool
+
+
+class TileWorkerLogs(list[Tuple[str, int]]): 
+    """Essa classe existe por quê e somente por quê o QGIS reclamou do pyqtSignal com genérico."""
+    pass
 
 
 class TileWorkerSignals(QObject):
+    """
+    QRunnable não suporta pyqtSignal. Sim, isso é intencional. Sim, essa é a forma normal de utilizar isso.
+    Foi planejado e feito dessa forma. Reclamações com o povo do PyQt, não comigo.
+    """
     result = pyqtSignal(TileResults)
-    logs = pyqtSignal(TileParams,list[Tuple[str, int]])
+    logs = pyqtSignal(TileParams,TileWorkerLogs)
 
 
 class TileWorkerContext:
+    """
+    O propósito dessa classe é garantir que independente do que acontecer, a conexão com o banco vai ser fechada (por
+    que se não for pode ser problema pro operador) e que os logs vão ser escritos (por que se não forem eu não tenho
+    como saber o que deu errado)
+    """
     conn: sqlite3.Connection|None = None
-    logs: list[Tuple[str,int]] = []
+    logs: TileWorkerLogs
     ok: bool = False
 
     def __init__(self, params: TileParams, signals: TileWorkerSignals):
         self.params = params
+        self.logs = TileWorkerLogs()
         self.signals = signals
     
     def __enter__(self):
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
+        self.log("Encerrado.", 1)
+        self.log(f"- Exc type  : {str(exc_type)}", 1)
+        self.log(f"- Exc value : {str(exc_value)}", 1)
+        self.log(f"- Traceback : {str(traceback)}", 1)
         try:
             if self.conn:
                 self.log("Fechando conexão com MBTiles", 1)
@@ -56,7 +76,7 @@ class TileWorkerContext:
             self.log("- Falhou ao fechar a conexão MBTiles", 2)
         try:
             self.log("Emitindo resultados", 1)
-            self.signals.result.emit(TileResults(tile=self.params.tile, ok=self.ok))
+            self.signals.result.emit(TileResults(tile=self.params.tile, success=self.ok))
             self.log("- Resultados emitidos", 1)
         except:
             self.log("- Falhou em emitir os resultados", 3)
@@ -68,17 +88,18 @@ class TileWorkerContext:
 
 
 class TileWorker(QRunnable):
-    def __init__(self, params: TileParams, signals: TileWorkerSignals):
+    def __init__(self, params: TileParams):
         super().__init__()
-        self.signals = signals
+        self.signals = TileWorkerSignals()
         self.params = params
         self.canceled = False
 
+    @pyqtSlot()
     def run(self):
-        tile = self.params.tile
-        source = self.params.source
-        requestBuilder = self.params.requestBuilder
         with TileWorkerContext(self.params, self.signals) as context:
+            tile = self.params.tile
+            source = self.params.source
+            requestBuilder = self.params.requestBuilder
             # Verifica se cancelado
             if self.canceled:
                 context.log(f"Cancelado, encerrando.", 1)
@@ -91,7 +112,7 @@ class TileWorker(QRunnable):
             # Abre conexão com o MBtiles
             context.log("Tentando abrir conexão com MBTiles", 1)
             context.log("- Conexão aberta com sucesso", 1)
-            context.conn = sqlite3.connect(self.tilepath)
+            context.conn = sqlite3.connect(self.params.tilepath)
             cursor = context.conn.cursor()
             # Verifica existência
             context.log("Verificando se o tile já existe", 1)
@@ -184,15 +205,15 @@ class WebMapCacheService(QObject):
     wmcs.ensureCache(extent, res_espacial) # Constrói persistentemente o cache da camada (tenta muitas vezes)
     ```
     """
+    message = pyqtSignal(str, int)
+    progressed = pyqtSignal()
+    started = pyqtSignal(int)
+    done = pyqtSignal()
 
     max_simultaneous_requests = 8
     mbtiles_driver = gdal.GetDriverByName("MBTiles")
     source = WMSSource(WMSSources.list_sources()[0])
     __mbtiles_cache_path = os.path.realpath("../cache")
-    message = pyqtSignal(str, int)
-    progressed = pyqtSignal()
-    started = pyqtSignal(int)
-    done = pyqtSignal()
     
     def __init__(self) -> None:
         super().__init__()
@@ -257,7 +278,10 @@ class WebMapCacheService(QObject):
     
     def start(self):
         """Dá inicio a execução dos processos, retorna True se teve sucesos e False caso contrário"""
+        # Isso aqui não é para proteger o Service de threads é pra proteger o Service dele mesmo.
+        # O abaixo não impede condições de corrida
         if self.busy: return False
+        self.busy = True
         self.active_workers.clear()
         self.results.clear()
         if not self.__setup_processes():
@@ -347,18 +371,17 @@ class WebMapCacheService(QObject):
         for params in list_of_params:
             if self.canceled:
                 return
-            signals = TileWorkerSignals()
-            signals.result.connect(self.__gather_results)
-            signals.logs.connect(self.__write_tile_logs)
-            worker = TileWorker(params=params, signals=signals)
+            worker = TileWorker(params=params)
+            worker.signals.result.connect(self.__gather_results)
+            worker.signals.logs.connect(self.__write_tile_logs)
             self.active_workers.append(worker)
             self.threadpool.start(worker)
     
     def __check_results(self):
         self.message.emit("Verificando que todos os tiles baixaram.", 1)
-        todos_ok = all([r.ok for r in self.results])
+        todos_ok = all([r.success for r in self.results])
         if not todos_ok:
-            nao_ok = [r.tile for r in self.results if not r.ok]
+            nao_ok = [r.tile for r in self.results if not r.success]
             self.message.emit(f"Há {len(nao_ok)} tiles que falharam. Tentando novamente.", 1)
             self.__start_processes()
             return

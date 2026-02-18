@@ -1,5 +1,5 @@
 from typing import List, Tuple
-import cv2
+from ...dependencies import cv2
 from .base_matcher import BaseMatcher
 from ...utils.logger import logger
 

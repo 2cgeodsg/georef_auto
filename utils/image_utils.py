@@ -1,5 +1,5 @@
-import cv2
-import numpy as np
+from ..dependencies import cv2
+from ..dependencies import numpy as np
 from .logger import logger
 
 def apply_clahe(image_gray, clip_limit=3.0, tile_grid=(8, 8)):

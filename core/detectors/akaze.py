@@ -1,5 +1,5 @@
-import cv2
-import numpy as np
+from ...dependencies import cv2
+from ...dependencies import numpy as np
 from typing import Tuple, List, Optional
 from .base_detector import BaseDetector
 from ...utils.logger import logger

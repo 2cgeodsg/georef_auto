@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 """Module for georeferencing logic, merging georef_auto2's working method with georef_auto_new's structure."""
 
-import cv2
-import numpy as np
-import rasterio
+from ..dependencies import cv2
+from ..dependencies import numpy as np
+from ..dependencies import rasterio
 import rasterio.warp # Adicionado
 import rasterio.transform # Adicionado
 from .render.render_reference import render_reference_image

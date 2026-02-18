@@ -10,6 +10,7 @@ def check_dependencies():
         "rasterio": "rasterio",
         "numpy": "numpy"
     }
+    dependencies_all_ok = True
 
     for module, package in packages.items():
         try:
@@ -18,6 +19,7 @@ def check_dependencies():
             try:
                 subprocess.check_call([sys.executable, "-m", "pip", "install", package])
             except Exception as e:
+                dependencies_all_ok = False
                 try:
                     from qgis.PyQt.QtWidgets import QMessageBox
                     QMessageBox.critical(
@@ -29,3 +31,11 @@ def check_dependencies():
                     )
                 except Exception:
                     print(f"[Plugin] Error installing '{package}': {e}")
+    return dependencies_all_ok
+
+if not check_dependencies():
+    raise ImportError("Instalação do plugin falhou.")
+
+import cv2
+import rasterio
+import numpy

@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import List, Tuple
-import cv2
+from ...dependencies import cv2
 
 class BaseMatcher(ABC):
 

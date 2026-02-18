@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import Tuple, List, Optional
-import numpy as np
+from ...dependencies import numpy as np
 
 class BaseDetector(ABC):
     @abstractmethod

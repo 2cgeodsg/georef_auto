@@ -2,9 +2,9 @@
 from __future__ import annotations
 
 import os
-import numpy as np
-import cv2
-import rasterio
+from ...dependencies import numpy as np
+from ...dependencies import cv2
+from ...dependencies import rasterio
 from datetime import datetime
 from typing import Tuple, Optional
 

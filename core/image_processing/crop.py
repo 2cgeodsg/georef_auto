@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import annotations
 from typing import Tuple
-import numpy as np
+from ...dependencies import numpy as np
 import logging
 
 logger = logging.getLogger(__name__)
