@@ -171,10 +171,11 @@ class TileWorker(QRunnable):
                         # (tile[0], tile[1], tile[2], sqlite3.Binary(tile_data))
                     )
                     context.conn.commit()
-                    context.ok
+                    context.ok = True
                     context.log("Tile armazenado no MBTiles.", 1)
+                    break
                 except Exception as e:
-                    context.log(f"- {attempt}/{total_storage_attempts} Erro ao armazenar: {e}.", 3)
+                    context.log(f"- {attempt+1}/{total_storage_attempts} Erro ao armazenar: {e}.", 3)
             return
     
     @staticmethod
@@ -269,8 +270,6 @@ class WebMapCacheService(QObject):
         # O abaixo não impede condições de corrida
         if self.busy: return False
         self.busy = True
-        self.active_workers.clear()
-        self.results.clear()
         if not self.__setup_processes():
             return False
         self.__start_processes()
@@ -330,6 +329,8 @@ class WebMapCacheService(QObject):
     
 
     def __start_processes(self):
+        self.active_workers.clear()
+        self.results.clear()
         assert self.threadpool
         self.message.emit("Preenchendo tiles paralelamente.", 1)
         if self.canceled:
