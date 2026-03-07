@@ -37,7 +37,7 @@ class MIGuessingService(QObject):
     """Serviço de alto nível para encontrar o(s) MI(s) ao qual a imagem (pode) pertence(r)"""
     
     done = pyqtSignal()
-    cancel = pyqtSignal()
+    canceled = pyqtSignal()
     primary_label = pyqtSignal(str)
     secondary_label = pyqtSignal(str)
     tertiary_label = pyqtSignal(str)
@@ -60,6 +60,7 @@ class MIGuessingService(QObject):
             613199.6633499705931172
         )
         self.wasCanceled = lambda: False
+        self.result = None
     
     def setParams(self, params: MIGuessingParams):
         self.params = params
@@ -81,60 +82,7 @@ class MIGuessingService(QObject):
         self.primary_progress_pushed.connect(p_dlg.pushSecondaryProgress)
         self.primary_progress_pushed.connect(p_dlg.pushTertiaryProgress)
         self.wasCanceled = p_dlg.wasCanceled
-        p_dlg.canceled().connect(self.cancel.emit)
-    
-    def divideExtentInRegions(self, ext):
-        regions = divideWithMetricSuperposition(
-            bbox=ext,
-            superposition=(self.img_diam, self.img_diam),
-            progress_callback=self.__progressCallback,
-            config=self.config
-        )
-        return regions
-    
-    def cacheSource(
-        self, 
-        source: WMSSource, 
-        cache_folder: str, 
-        extent: QgsRectangle, 
-        zoom: int
-    ):
-        """Essa função dá inicio ao processo de cache"""
-        self.secondary_label.emit("Setting up WMS Cache Service.")
-        self.wmcs = WebMapCacheService()
-        self.wmcs.setParams(cache_folder, source, extent, zoom)
-        self.wmcs.message.connect(self.tertiary_label.emit)
-        self.wmcs.started.connect(self.tertiary_total.emit)
-        self.wmcs.progressed.connect(self.tertiary_progress_pushed.emit)
-        self.wmcs.done.connect(self.onCacheDone)
-        self.cancel.connect(self.wmcs.cancel)
-        self.secondary_label.emit("Cacheing WMS Layer...")
-        return self.wmcs.start()
-    
-    def onCacheDone(self):
-        self.secondary_label.emit("Loading cached layer...")
-        assert isinstance(self.params.reference, MIGuessingReferenceWMS)
-        source = self.params.reference.source
-        fp = os.path.normpath(os.path.realpath(os.path.join(self.params.reference.cache_folder, f'{source.source_id}.mbtiles')))
-        self.layer = QgsRasterLayer(fp, source.alias, "gdal")
-        self.findAndAddPossibleRegions()
-    
-    def findAndAddPossibleRegions(self):
-        # Check for each region if it's possible that the image is in there
-        self.secondary_label.emit("Checking whether each subregion is possible")
-        self.tertiary_total.emit(100)
-        is_possible = [isPossibleLocation(
-            self.params.image_path,
-            polygon_geom=self.__extentToGeom(reg),
-            reference_layer=self.ref_layer,
-            progress_callback=self.__progressCallback,
-            config=self.config,
-            wasCanceled=self.wasCanceled
-        ) for reg in self.regions]
-        self.secondary_progress_pushed.emit()
-        # Filter the possible extents
-        self.secondary_label.emit("Filtering possible subregions...")
-        self.possible_extents.extend(self.regions[i] for i in range(len(self.regions)) if is_possible[i])
+        p_dlg.canceled().connect(self.canceled.emit)
 
     def start(self):
         self.minz = 8
@@ -146,7 +94,6 @@ class MIGuessingService(QObject):
         self.possible_extents = [self.EXTENSAO_BRASIL]
         self.primary_total.emit(self.maxz - self.minz + 1)
         self.__run_next_zoom_level()
-
 
     def __run_next_zoom_level(self):
         self.curz += 1
@@ -164,13 +111,13 @@ class MIGuessingService(QObject):
         # Cut up the region
         self.secondary_label.emit("Dividing region into subregions...")
         ext = self.open_extents.pop()
-        self.regions = self.divideExtentInRegions(ext)
+        self.regions = self.__divideExtentInRegions(ext)
         
         self.tertiary_label.emit("")
         self.secondary_progress_pushed.emit()
         # Cache the extent
         if isinstance(self.params.reference, MIGuessingReferenceWMS):
-             return self.cacheSource(
+             return self.__cacheSource(
                 source=self.params.reference.source,
                 cache_folder=self.params.reference.cache_folder,
                 extent=ext,
@@ -178,12 +125,74 @@ class MIGuessingService(QObject):
             )
         elif isinstance(self.params.reference, MIGuessingReferenceLayer):
             self.layer = self.params.reference.reference_layer
-            self.findAndAddPossibleRegions()
+            self.__findAndAddPossibleRegions()
             self.secondary_progress_pushed.emit()
             return True
         else:
             raise TypeError("params.reference must be of valid type!")
     
+    def __divideExtentInRegions(self, ext):
+        regions = divideWithMetricSuperposition(
+            bbox=ext,
+            superposition=(self.img_diam, self.img_diam),
+            progress_callback=self.__progressCallback,
+            config=self.config
+        )
+        return regions
+    
+    def __cacheSource(
+        self, 
+        source: WMSSource, 
+        cache_folder: str, 
+        extent: QgsRectangle, 
+        zoom: int
+    ):
+        """Essa função dá inicio ao processo de cache"""
+        self.secondary_label.emit("Setting up WMS Cache Service.")
+        self.wmcs = WebMapCacheService()
+        self.wmcs.setParams(cache_folder, source, extent, zoom)
+        self.wmcs.message.connect(self.tertiary_label.emit)
+        self.wmcs.started.connect(self.tertiary_total.emit)
+        self.wmcs.progressed.connect(self.tertiary_progress_pushed.emit)
+        self.wmcs.done.connect(self.__onCacheDone)
+        self.canceled.connect(self.wmcs.cancel)
+        self.secondary_label.emit("Cacheing WMS Layer...")
+        return self.wmcs.start()
+    
+    def __onCacheDone(self):
+        assert self.wmcs
+        self.secondary_label.emit("Loading cached layer...")
+        assert isinstance(self.params.reference, MIGuessingReferenceWMS)
+        source = self.params.reference.source
+        fp = os.path.normpath(os.path.realpath(os.path.join(self.params.reference.cache_folder, f'{source.source_id}.mbtiles')))
+        self.layer = QgsRasterLayer(fp, source.alias, "gdal")
+        self.__findAndAddPossibleRegions()
+    
+    def __findAndAddPossibleRegions(self):
+        assert self.layer 
+        assert self.config
+        assert self.params
+        # Check for each region if it's possible that the image is in there
+        self.secondary_label.emit("Checking whether each subregion is possible")
+        self.tertiary_total.emit(100)
+        is_possible = [True] * len(self.regions)
+        with open("C:/logsgeoref/preprocessing/bbbb.txt", "w") as f:
+            f.write(str([reg.toString(2) for reg in self.regions]))
+        for i, reg in enumerate(self.regions):
+            is_possible[i] = isPossibleLocation(
+                self.params.image_path,
+                polygon_geom=self.__extentToGeom(reg),
+                reference_layer=self.layer,
+                zoom=self.curz,
+                progress_callback=self.__progressCallback,
+                config=self.config,
+                wasCanceled=self.wasCanceled
+            )
+            self.secondary_progress_pushed.emit()
+        # Filter the possible extents
+        self.secondary_label.emit("Filtering possible subregions...")
+        self.possible_extents.extend(self.regions[i] for i in range(len(self.regions)) if is_possible[i])
+
     def __calculateImageDiameter(self):
         img = carregarImagem(self.params.image_path)
         shape = img.shape

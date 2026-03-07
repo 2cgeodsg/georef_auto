@@ -1,19 +1,17 @@
-import logging
-import os
 from typing import Callable, Tuple
 
-from ..dependencies import rasterio
+from qgis.core import QgsCoordinateReferenceSystem, QgsGeometry, QgsRectangle
 
+from ..dependencies import rasterio
+from ..dependencies import numpy as np
 from ..dependencies import cv2
 from cv2.gapi import div
 
-from qgis.core import QgsGeometry, QgsRectangle
-
-from .georeferencing import render
 from .config import GeoreferencingConfig
 from .detectors import RootSIFTDetector
 from .matchers.flann_matcher import FLANNMatcher
 from ..utils.process_logger import ProcessLogger
+from .render.render_reference import render_reference_image_to_spatial_resolution
 
 
 def carregarImagem(
@@ -27,11 +25,49 @@ def carregarImagem(
         raise ValueError(f"Não foi possível carregar a imagem não georreferenciada: {image_path}")
     return cv2.cvtColor(img_original_color, cv2.COLOR_BGR2GRAY)
 
+def zoom_to_spatial_res(zoom: int):
+    return 156416.0 / pow(2, zoom)
+
+def render(
+    polygon_geom: QgsGeometry,
+    reference_layer,
+    zoom_level: int,
+    p_log: ProcessLogger|None=None,
+    debug_output_dir: str = "C:/logsgeoref"
+):
+    if p_log: p_log.start("render_ref")
+    img_ref_crop, bounds_crop, epsg, path_ref_geotiff = render_reference_image_to_spatial_resolution(
+        reference_layer,
+        polygon_geom,
+        spatial_resolution=zoom_to_spatial_res(zoom_level),
+        spatial_resolution_crs=QgsCoordinateReferenceSystem("EPSG:3857"),
+        debug_output_dir=debug_output_dir
+    )
+    if p_log: p_log.end("render_ref")
+    if img_ref_crop is None or bounds_crop is None or epsg is None or path_ref_geotiff is None:
+        raise ValueError("Falha ao renderizar a imagem de referência.")
+    
+    if img_ref_crop is None:
+        raise ValueError("Imagem de referência nula retornada do render.")
+
+    if img_ref_crop.ndim != 3 or img_ref_crop.shape[2] != 3:
+        raise ValueError(f"Imagem de referência com formato inesperado: shape={img_ref_crop.shape}")
+
+    if img_ref_crop.dtype != np.uint8:
+        img_ref_crop = img_ref_crop.astype(np.uint8, copy=False)
+
+    # garante buffer próprio e C-contíguo (evita access violation)
+    if (not img_ref_crop.flags['C_CONTIGUOUS']) or (img_ref_crop.base is not None):
+        img_ref_crop = np.ascontiguousarray(img_ref_crop.copy())
+    
+    return img_ref_crop, bounds_crop, epsg, path_ref_geotiff
+
 
 def isPossibleLocation(
     image_path: str,
     polygon_geom: QgsGeometry,
     reference_layer,
+    zoom: int,
     log_dir: str = "C:/logsgeoref/preprocessing",
     progress_callback=None,
     config: GeoreferencingConfig = GeoreferencingConfig(),
@@ -41,16 +77,15 @@ def isPossibleLocation(
     Pipeline: render → detectar → match → retornar.
     Todos os parâmetros operacionais vêm de `config`. 
     """
-
+    if progress_callback: progress_callback(0, "Iniciando...")
     if wasCanceled and wasCanceled(): return False
 
     # 1) Render da referência (usa config.render_width_px)
-    if progress_callback: progress_callback(10, "Renderizando área de referência...")
+    if progress_callback: progress_callback(0, "Renderizando área de referência...")
     img_ref_crop, bounds_crop, epsg, path_ref_geotiff = render(
         polygon_geom,
         reference_layer,
-        None,
-        config=config,
+        zoom,
         debug_output_dir=log_dir
     )
     img_ref_gray = cv2.cvtColor(img_ref_crop, cv2.COLOR_BGR2GRAY)
@@ -104,7 +139,7 @@ def divideWithMetricSuperposition(
     dX = (sX * (divs - 1) + bbox.xMaximum() - bbox.xMinimum()) / divs
     dY = (sY * (divs - 1) + bbox.yMaximum() - bbox.yMinimum()) / divs
 
-    pX = [(dX - sX) * n for n in range(divs)]
-    pY = [(dY - sY) * n for n in range(divs)]
+    pX = [bbox.xMinimum() + (dX - sX) * n for n in range(divs)]
+    pY = [bbox.yMinimum() + (dY - sY) * n for n in range(divs)]
 
     return [QgsRectangle(pX[i], pY[j], pX[i] + dX, pY[j] + dY) for i in range(divs) for j in range(divs)]

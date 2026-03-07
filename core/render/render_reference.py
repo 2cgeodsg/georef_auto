@@ -112,7 +112,6 @@ def _qimage_to_bgr(img: QImage) -> np.ndarray:
 
 def _render_image(
     layer,
-    poly_layer_crs: QgsGeometry, 
     bounds: QgsRectangle, 
     target_width_px: int,
     target_height_px: int,
@@ -194,7 +193,7 @@ def render_reference_image_to_size(
         )
 
         # 4) Renderiza
-        return _render_image(layer, poly_layer_crs, bounds, target_width_px, target_height_px, debug_output_dir)
+        return _render_image(layer, bounds, target_width_px, target_height_px, debug_output_dir)
         
 
     except Exception as e:
@@ -242,7 +241,7 @@ def render_reference_image_to_spatial_resolution(
         )
 
         # 4) Renderiza
-        return _render_image(layer, poly_layer_crs, bounds, target_width_px, target_height_px, debug_output_dir)
+        return _render_image(layer, bounds, target_width_px, target_height_px, debug_output_dir)
         
 
     except Exception as e:
