@@ -63,7 +63,7 @@ def render(
     return img_ref_crop, bounds_crop, epsg, path_ref_geotiff
 
 
-def isPossibleLocation(
+def goodMatchesInLocation(
     image_path: str,
     polygon_geom: QgsGeometry,
     reference_layer,
@@ -78,7 +78,7 @@ def isPossibleLocation(
     Todos os parâmetros operacionais vêm de `config`. 
     """
     if progress_callback: progress_callback(0, "Iniciando...")
-    if wasCanceled and wasCanceled(): return False
+    if wasCanceled and wasCanceled(): return []
 
     # 1) Render da referência (usa config.render_width_px)
     if progress_callback: progress_callback(0, "Renderizando área de referência...")
@@ -90,13 +90,13 @@ def isPossibleLocation(
     )
     img_ref_gray = cv2.cvtColor(img_ref_crop, cv2.COLOR_BGR2GRAY)
 
-    if wasCanceled and wasCanceled(): return False
+    if wasCanceled and wasCanceled(): return []
     
     # 2) Carregar imagem fonte
     if progress_callback: progress_callback(20, "Carregando imagem de entrada...")
     img_original_gray = carregarImagem(image_path)
 
-    if wasCanceled and wasCanceled(): return False
+    if wasCanceled and wasCanceled(): return []
 
     # 4) Detectar/Descrever
     if progress_callback: progress_callback(40, "Detectando características (RootSIFT)...")
@@ -108,7 +108,7 @@ def isPossibleLocation(
         raise ValueError(f"Descritores insuficientes: kp_src={len(kp1 or [])}, kp_ref={len(kp2 or [])}, "
                         f"min_features={config.min_features}.")
 
-    if wasCanceled and wasCanceled(): return False
+    if wasCanceled and wasCanceled(): return []
 
     # 5) Matching
     if progress_callback: progress_callback(80, "Correspondendo características (FLANN)...")
@@ -118,10 +118,10 @@ def isPossibleLocation(
     desc2 = desc2.astype(desc_type)
     good_matches, raw_matches = matcher.match(desc1, desc2, kp1, kp2)
 
-    if wasCanceled and wasCanceled(): return False
+    if wasCanceled and wasCanceled(): return []
 
     if progress_callback: progress_callback(100, "Pronto")
-    return len(good_matches) >= config.search_min_features
+    return good_matches
 
 
 

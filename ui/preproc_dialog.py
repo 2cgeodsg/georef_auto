@@ -193,6 +193,7 @@ class GeorefPreprocDialog(QDialog, Ui_GeorefPreprocDialog):
         # Connect signals and cancelations
         self.mgs.setCanceled(self.progress_dlg.wasCanceled)
         self.mgs.connectProgressDialog(self.progress_dlg)
+        self.mgs.canceled.connect(self.on_image_search_canceled)
         self.mgs.done.connect(self.on_image_search_done)
         # Execute
         self.thread.started.connect(self.mgs.start)
@@ -209,4 +210,8 @@ class GeorefPreprocDialog(QDialog, Ui_GeorefPreprocDialog):
             sleep(0.1)
             QCoreApplication.processEvents()
         self.progress_dlg.hide()
+        self.btnLocate.setEnabled(True)
+    
+    def on_image_search_canceled(self):
+        self.progress_dlg.close()
         self.btnLocate.setEnabled(True)

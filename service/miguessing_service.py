@@ -6,12 +6,14 @@ from math import pow, sqrt
 import os
 from typing import Callable
 
+from cv2 import DMatch
+
 from qgis.core import QgsMapLayer, QgsGeometry, QgsRectangle, Qgis, QgsPointXY, QgsRasterLayer
 from PyQt5.QtCore import QObject, pyqtSignal, QThread
 
 from ..service.webmapcache_service import WebMapCacheService
 from ..core.config import GeoreferencingConfig
-from ..core.miguessing import carregarImagem, divideWithMetricSuperposition, isPossibleLocation
+from ..core.miguessing import carregarImagem, divideWithMetricSuperposition, goodMatchesInLocation
 from ..sources.wms_sources import WMSSource
 from ..utils.progress_dialog import ProgressDialog
 
@@ -175,11 +177,9 @@ class MIGuessingService(QObject):
         # Check for each region if it's possible that the image is in there
         self.secondary_label.emit("Checking whether each subregion is possible")
         self.tertiary_total.emit(100)
-        is_possible = [True] * len(self.regions)
-        with open("C:/logsgeoref/preprocessing/bbbb.txt", "w") as f:
-            f.write(str([reg.toString(2) for reg in self.regions]))
-        for i, reg in enumerate(self.regions):
-            is_possible[i] = isPossibleLocation(
+        matches : list[list[DMatch]] = []
+        for reg in self.regions:
+            matches.append(goodMatchesInLocation(
                 self.params.image_path,
                 polygon_geom=self.__extentToGeom(reg),
                 reference_layer=self.layer,
@@ -187,11 +187,14 @@ class MIGuessingService(QObject):
                 progress_callback=self.__progressCallback,
                 config=self.config,
                 wasCanceled=self.wasCanceled
-            )
+            ))
             self.secondary_progress_pushed.emit()
         # Filter the possible extents
         self.secondary_label.emit("Filtering possible subregions...")
-        self.possible_extents.extend(self.regions[i] for i in range(len(self.regions)) if is_possible[i])
+        self.possible_extents.extend(self.regions[i] for i in range(len(self.regions)) if len(matches) > self.config.min_features)
+        with open(f"C:/logsgeoref/preprocessing/possible_extents_{self.curz}.txt", "a") as f:
+            for i, ext in enumerate(self.possible_extents):
+                f.write(f"{ext.toString(2)} with {len(matches[i])}\n")
 
     def __calculateImageDiameter(self):
         img = carregarImagem(self.params.image_path)
