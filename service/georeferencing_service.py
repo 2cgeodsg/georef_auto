@@ -204,6 +204,7 @@ class GeoreferencingService:
 
             # demais -> mosaico2.tif, mosaico3.tif, ...
             for idx, p in enumerate(saidas[1:], start=2):
+                QApplication.processEvents()
                 alvo = os.path.join(pasta_saida, f"{nome_base}{idx}{ext}")
                 if os.path.abspath(p) != os.path.abspath(alvo):
                     try:

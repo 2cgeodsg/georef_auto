@@ -23,6 +23,7 @@ from ...dependencies import numpy as np
 
 from .config import MosaicConfig
 from ...utils.logger import logger
+from PyQt5.QtCore import QApplication
 
 
 # ====================================================================
@@ -180,6 +181,7 @@ def _combinar_passada(
     imagens_disponiveis = list(imagens)
 
     for i in range(len(imagens_disponiveis)):
+        QApplication.processEvents()
         if imagens_disponiveis[i] in imagens_usadas:
             continue
 
@@ -189,6 +191,7 @@ def _combinar_passada(
         melhor_caminho2 = None
 
         for j in range(i + 1, len(imagens_disponiveis)):
+            QApplication.processEvents()
             if imagens_disponiveis[j] in imagens_usadas:
                 continue
 
@@ -208,6 +211,7 @@ def _combinar_passada(
                         melhor_caminho2 = caminho2
                     del mosaico_atual # Libera memória do mosaico temporário
                     gc.collect()
+        QApplication.processEvents()
 
         if melhor_mosaico_data is not None:
             nome_mosaico = os.path.join(tmp_dir, f"mosaico_tmp_{etapa}_{len(nova_lista)}.jpg")
@@ -218,13 +222,16 @@ def _combinar_passada(
             print(f"✅ Mosaico: {os.path.basename(caminho1)} + {os.path.basename(melhor_caminho2)} ({melhor_n_matches} inliers)")
             del melhor_mosaico_data # Libera memória do melhor mosaico
             gc.collect()
+    QApplication.processEvents()
 
     for caminho in imagens:
+        QApplication.processEvents()
         if caminho not in imagens_usadas:
             destino = os.path.join(tmp_dir, f"solo_tmp_{etapa}_{len(nova_lista)}.jpg")
             shutil.copy2(caminho, destino)
             nova_lista.append(destino)
             print(f"🧩 Mantida isolada: {os.path.basename(caminho)}")
+    QApplication.processEvents()
 
     return nova_lista
 
@@ -254,10 +261,12 @@ def gerar_mosaicos_nao_georef(
 
     # Força a extensão para .jpg nos arquivos temporários, como no script original
     ext_temp = ".jpg"
+    QApplication.processEvents()
 
     # --- Loop de etapas ---
     etapa = 1
     while len(imagens) > 1:
+        QApplication.processEvents()
         num_antes = len(imagens)
         tmp_dir_etapa = os.path.join(tmp_dir_base, f"etapa_{etapa}")
         
@@ -273,6 +282,7 @@ def gerar_mosaicos_nao_georef(
     if not ext_final.startswith("."): ext_final = "." + ext_final
 
     for i, caminho_tmp in enumerate(imagens, 1):
+        QApplication.processEvents()
         nome_final = f"mosaico_final_{i}{ext_final}"
         caminho_final = os.path.join(pasta_saida, nome_final)
         shutil.copy2(caminho_tmp, caminho_final)
@@ -281,6 +291,6 @@ def gerar_mosaicos_nao_georef(
 
     shutil.rmtree(tmp_dir_base, ignore_errors=True)
     logger.info(f"\n✨ Processo concluído! {len(saidas_finais)} mosaicos finais gerados.")
-    
+    QApplication.processEvents()
     return saidas_finais
 
