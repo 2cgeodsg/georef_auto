@@ -86,9 +86,9 @@ class GeorefCacheDialog(QDialog, Ui_GeorefCacheDialog):
         self.btnCreateCache.setEnabled(False)
         self.tabWidget.setCurrentIndex(1)
 
-        self.thread = QThread()
+        self.wmcsThread = QThread()
         self.wmcs = WebMapCacheService()
-        self.wmcs.moveToThread(self.thread)
+        self.wmcs.moveToThread(self.wmcsThread)
 
         self.wmcs.setParams(
             mbtiles_realpath=self.getOutputPath(), 
@@ -102,8 +102,8 @@ class GeorefCacheDialog(QDialog, Ui_GeorefCacheDialog):
         self.wmcs.started.connect(self.startProgress)
         self.wmcs.done.connect(self.cache_done)
 
-        self.thread.started.connect(self.wmcs.start)
-        self.thread.start()
+        self.wmcsThread.started.connect(self.wmcs.start)
+        self.wmcsThread.start()
     
     @pyqtSlot()
     def cache_done(self):
