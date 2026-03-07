@@ -6,7 +6,7 @@ from ..dependencies import numpy as np
 from ..dependencies import rasterio
 import rasterio.warp # Adicionado
 import rasterio.transform # Adicionado
-from .render.render_reference import render_reference_image
+from .render.render_reference import render_reference_image_to_size
 import os
 from .detectors import  RootSIFTDetector
 from .matchers.flann_matcher import FLANNMatcher
@@ -96,10 +96,10 @@ def render(
     debug_output_dir: str = "C:/logsgeoref"
 ):
     if p_log: p_log.start("render_ref")
-    img_ref_crop, bounds_crop, epsg, path_ref_geotiff = render_reference_image(
+    img_ref_crop, bounds_crop, epsg, path_ref_geotiff = render_reference_image_to_size(
         reference_layer,
         polygon_geom,
-        config=config,
+        width=config.render_width_px,
         debug_output_dir=debug_output_dir
     )
     if p_log: p_log.end("render_ref")

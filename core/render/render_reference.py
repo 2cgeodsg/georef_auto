@@ -11,6 +11,7 @@ from typing import Tuple, Optional
 from rasterio.transform import from_bounds
 
 from qgis.core import (
+    QgsCoordinateReferenceSystem,
     QgsRectangle,
     QgsMapSettings,
     QgsMapRendererCustomPainterJob,
@@ -71,17 +72,16 @@ def _salvar_geotiff_temporario(
     return debug_path
 
 
-def _transformar_poligono_para_crs_da_layer(polygon_geom: QgsGeometry, layer) -> QgsGeometry:
+def _transformar_poligono(polygon_geom: QgsGeometry, dest_crs) -> QgsGeometry:
     """
     Reprojeta o polígono do CRS do projeto para o CRS da layer (se necessário).
     """
-    layer_crs = layer.crs()
     proj_crs = QgsProject.instance().crs()
 
-    if layer_crs.authid() == proj_crs.authid():
+    if dest_crs.authid() == proj_crs.authid():
         return QgsGeometry(polygon_geom)  # cópia
 
-    xform = QgsCoordinateTransform(proj_crs, layer_crs, QgsProject.instance().transformContext())
+    xform = QgsCoordinateTransform(proj_crs, dest_crs, QgsProject.instance().transformContext())
     poly = QgsGeometry(polygon_geom)
     poly.transform(xform)  # in-place
     return poly
@@ -110,10 +110,56 @@ def _qimage_to_bgr(img: QImage) -> np.ndarray:
     return bgr.copy()
 
 
-def render_reference_image(
+def _render_image(
+    layer,
+    poly_layer_crs: QgsGeometry, 
+    bounds: QgsRectangle, 
+    target_width_px: int,
+    target_height_px: int,
+    debug_output_dir: Optional[str] = None
+):
+    # 1) Configura o render
+    map_settings = QgsMapSettings()
+    map_settings.setLayers([layer])
+    map_settings.setExtent(bounds)
+    map_settings.setOutputSize(QSize(target_width_px, target_height_px))
+    map_settings.setDestinationCrs(layer.crs())
+
+    img = QImage(target_width_px, target_height_px, QImage.Format_ARGB32_Premultiplied)
+    img.fill(Qt.transparent)
+    painter = QPainter(img)
+
+    job = QgsMapRendererCustomPainterJob(map_settings, painter)
+    job.start()
+    job.waitForFinished()
+    painter.end()
+
+    # 2) Converte para BGR (np.ndarray)
+    bgr = _qimage_to_bgr(img)
+    if bgr is None or bgr.size == 0:
+        raise ValueError("Falha ao converter imagem renderizada para array NumPy.")
+
+    # 3) Cria uma versão grayscale+CLAHE apenas para salvar GeoTIFF de depuração
+    img_gray = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY)
+    img_clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8)).apply(img_gray)
+
+    debug_path = _salvar_geotiff_temporario(
+        img_clahe,
+        bounds,
+        layer.crs().authid(),
+        target_width_px,
+        target_height_px,
+        debug_output_dir=debug_output_dir
+    )
+
+    epsg_code = layer.crs().authid().replace("EPSG:", "")
+    return bgr, bounds, epsg_code, debug_path
+
+
+def render_reference_image_to_size(
     layer,
     polygon_geom: QgsGeometry,
-    config: GeoreferencingConfig,
+    width: int,
     debug_output_dir: Optional[str] = None
 ) -> Tuple[Optional[np.ndarray], Optional[QgsRectangle], Optional[str], Optional[str]]:
     """
@@ -131,7 +177,7 @@ def render_reference_image(
             raise ValueError("Geometria do polígono inválida.")
 
         # 1) Garante que o polígono está no CRS da layer
-        poly_layer_crs = _transformar_poligono_para_crs_da_layer(polygon_geom, layer)
+        poly_layer_crs = _transformar_poligono(polygon_geom, layer.crs())
 
         # 2) Extensão no CRS da layer
         bounds = poly_layer_crs.boundingBox()
@@ -139,7 +185,7 @@ def render_reference_image(
             raise ValueError("Extensão (bounding box) do polígono inválida ou com dimensão zero.")
 
         # 3) Dimensões de saída
-        target_width_px = max(1, int(config.render_width_px))
+        target_width_px = max(1, width)
         target_height_px = max(1, int(round((bounds.height() / bounds.width()) * target_width_px)))
 
         logger.info(
@@ -147,42 +193,57 @@ def render_reference_image(
             bounds.toString(), target_width_px, target_height_px
         )
 
-        # 4) Configura o render
-        map_settings = QgsMapSettings()
-        map_settings.setLayers([layer])
-        map_settings.setExtent(bounds)
-        map_settings.setOutputSize(QSize(target_width_px, target_height_px))
-        map_settings.setDestinationCrs(layer.crs())
+        # 4) Renderiza
+        return _render_image(layer, poly_layer_crs, bounds, target_width_px, target_height_px, debug_output_dir)
+        
 
-        img = QImage(target_width_px, target_height_px, QImage.Format_ARGB32_Premultiplied)
-        img.fill(Qt.transparent)
-        painter = QPainter(img)
+    except Exception as e:
+        logger.error(f"Erro ao renderizar imagem de referência: {e}")
+        logger.error(traceback.format_exc())
+        return None, None, None, None
 
-        job = QgsMapRendererCustomPainterJob(map_settings, painter)
-        job.start()
-        job.waitForFinished()
-        painter.end()
+def render_reference_image_to_spatial_resolution(
+    layer,
+    polygon_geom: QgsGeometry,
+    spatial_resolution: float,
+    spatial_resolution_crs: QgsCoordinateReferenceSystem,
+    debug_output_dir: Optional[str] = None
+) -> Tuple[Optional[np.ndarray], Optional[QgsRectangle], Optional[str], Optional[str]]:
+    """
+    Renderiza a seção da layer definida pelo polígono para uma imagem BGR (np.ndarray),
+    retornando também o bounding box (QgsRectangle), o EPSG (string sem 'EPSG:') e o
+    caminho do GeoTIFF temporário salvo (com CLAHE), para depuração.
 
-        # 5) Converte para BGR (np.ndarray)
-        bgr = _qimage_to_bgr(img)
-        if bgr is None or bgr.size == 0:
-            raise ValueError("Falha ao converter imagem renderizada para array NumPy.")
+    Retorna: (rgb_bgr, bounds_layer_crs, epsg_code, debug_geotiff_path)
+    Em caso de erro: (None, None, None, None)
+    """
+    try:
+        if not layer or not layer.isValid():
+            raise ValueError("Camada de referência inválida.")
+        if not polygon_geom or polygon_geom.isEmpty():
+            raise ValueError("Geometria do polígono inválida.")
 
-        # 6) Cria uma versão grayscale+CLAHE apenas para salvar GeoTIFF de depuração
-        img_gray = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY)
-        img_clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8)).apply(img_gray)
+        # 1) Garante que o polígono está no CRS da layer
+        poly_layer_crs = _transformar_poligono(polygon_geom, layer.crs())
 
-        debug_path = _salvar_geotiff_temporario(
-            img_clahe,
-            bounds,
-            layer.crs().authid(),
-            target_width_px,
-            target_height_px,
-            debug_output_dir=debug_output_dir
+        # 2) Extensão no CRS da layer
+        bounds = poly_layer_crs.boundingBox()
+        if bounds.isEmpty() or bounds.width() == 0 or bounds.height() == 0:
+            raise ValueError("Extensão (bounding box) do polígono inválida ou com dimensão zero.")
+
+        # 3) Dimensões de saída
+        bounds_spres = _transformar_poligono(polygon_geom, spatial_resolution_crs).boundingBox()
+        target_width_px = max(1, int(bounds_spres.width() / spatial_resolution))
+        target_height_px = max(1, int(round((bounds.height() / bounds.width()) * target_width_px)))
+
+        logger.info(
+            "Renderizando área de referência: %s para %dx%d pixels.",
+            bounds.toString(), target_width_px, target_height_px
         )
 
-        epsg_code = layer.crs().authid().replace("EPSG:", "")
-        return bgr, bounds, epsg_code, debug_path
+        # 4) Renderiza
+        return _render_image(layer, poly_layer_crs, bounds, target_width_px, target_height_px, debug_output_dir)
+        
 
     except Exception as e:
         logger.error(f"Erro ao renderizar imagem de referência: {e}")
