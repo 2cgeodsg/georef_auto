@@ -179,8 +179,7 @@ class GeorefPreprocDialog(QDialog, Ui_GeorefPreprocDialog):
             add_possible_mi_to_project=self.getAddMiToProject(),
             reference=self.getReference()
         )
-        self.mgs.setParams(params)
-        self.mgs.setCanceled(self.progress_dlg.wasCanceled)
+        self.mgs.moveToThread(self.thread)
         # Setup progress dialog
         self.progress_dlg.setPrimaryLabel("")
         self.progress_dlg.setSecondaryLabel("")
@@ -189,17 +188,21 @@ class GeorefPreprocDialog(QDialog, Ui_GeorefPreprocDialog):
         self.progress_dlg.setSecondaryTotal(0)
         self.progress_dlg.setTertiaryTotal(0)
         QCoreApplication.processEvents()
-        # Move object to thread and connect signals (SE TROCAR A ORDEM VAI CONGELAR A INTERFACE!)
-        self.mgs.moveToThread(self.thread)
+        # Set params
+        self.mgs.setParams(params)
+        # Connect signals and cancelations
+        self.mgs.setCanceled(self.progress_dlg.wasCanceled)
         self.mgs.connectProgressDialog(self.progress_dlg)
+        self.mgs.done.connect(self.on_image_search_done)
         # Execute
-        self.thread.started.connect(self.mgs.run)
+        self.thread.started.connect(self.mgs.start)
         self.thread.start()
         # Show progres
         self.progress_dlg.show()
         
     
-    def on_image_search_done(self, result):
+    def on_image_search_done(self):
+        result = self.mgs.result
         self.progress_dlg.setDescription("SUCESSO" if result else "BARRO")
         QCoreApplication.processEvents()
         for n in range(30):
