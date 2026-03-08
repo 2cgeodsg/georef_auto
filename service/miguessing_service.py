@@ -13,7 +13,8 @@ from PyQt5.QtCore import QObject, pyqtSignal, QThread
 
 from ..service.webmapcache_service import WebMapCacheService
 from ..core.config import GeoreferencingConfig
-from ..core.miguessing import carregarImagem, divideWithMetricSuperposition, goodMatchesInLocation
+from ..core.estimators.homography_base import ResultadoHomografia
+from ..core.miguessing import carregarImagem, divideWithMetricSuperposition, checkRegion
 from ..sources.wms_sources import WMSSource
 from ..utils.progress_dialog import ProgressDialog
 
@@ -87,7 +88,7 @@ class MIGuessingService(QObject):
         p_dlg.canceled().connect(self.canceled.emit)
 
     def start(self):
-        self.minz = 8
+        self.minz = 10
         self.maxz = 12
         self.curz = self.minz - 1
         self.img_diam = self.__calculateImageDiameter()
@@ -177,9 +178,9 @@ class MIGuessingService(QObject):
         # Check for each region if it's possible that the image is in there
         self.secondary_label.emit("Checking whether each subregion is possible")
         self.tertiary_total.emit(100)
-        matches : list[list[DMatch]] = []
+        resultados: list[ResultadoHomografia | None] = []
         for reg in self.regions:
-            matches.append(goodMatchesInLocation(
+            resultados.append(checkRegion(
                 self.params.image_path,
                 polygon_geom=self.__extentToGeom(reg),
                 reference_layer=self.layer,
@@ -191,10 +192,11 @@ class MIGuessingService(QObject):
             self.secondary_progress_pushed.emit()
         # Filter the possible extents
         self.secondary_label.emit("Filtering possible subregions...")
-        self.possible_extents.extend(self.regions[i] for i in range(len(self.regions)) if len(matches) > self.config.min_features)
+        self.possible_extents.extend(self.regions[i] for i in range(len(self.regions)) if len(resultados) > self.config.min_features)
         with open(f"C:/logsgeoref/preprocessing/possible_extents_{self.curz}.txt", "a") as f:
             for i, ext in enumerate(self.possible_extents):
-                f.write(f"{ext.toString(2)} with {len(matches[i])}\n")
+                r = resultados[i]
+                f.write(f"{ext.toString(2)} with {f'inliners=({r.n_inliers}/{r.n_corresp}), thr={r.reproj_thresh}px, conf={r.confidence}' if r else 'NOTHING'}\n")
 
     def __calculateImageDiameter(self):
         img = carregarImagem(self.params.image_path)

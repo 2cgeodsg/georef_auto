@@ -23,7 +23,7 @@ from ...dependencies import numpy as np
 
 from .config import MosaicConfig
 from ...utils.logger import logger
-from PyQt5.QtCore import QApplication
+from PyQt5.QtWidgets import QApplication
 
 
 # ====================================================================

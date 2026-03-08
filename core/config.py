@@ -26,5 +26,5 @@ class GeoreferencingConfig:
     warn_polygon_area_km2: float = 1500.0  # apenas aviso no log
 
     # Procura do MI
-    search_division: int = 5
+    search_division: int = 8
     search_min_features: int = 1    # mínimo para não descartar a região como possibilidade.

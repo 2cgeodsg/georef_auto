@@ -1,4 +1,4 @@
-from typing import Callable, Tuple
+from typing import Callable, List, Tuple
 
 from qgis.core import QgsCoordinateReferenceSystem, QgsGeometry, QgsRectangle
 
@@ -12,6 +12,9 @@ from .detectors import RootSIFTDetector
 from .matchers.flann_matcher import FLANNMatcher
 from ..utils.process_logger import ProcessLogger
 from .render.render_reference import render_reference_image_to_spatial_resolution
+from .estimators.homography_base import ParCorrespondencia, Ponto2D
+from .estimators.homography_ransac import RansacHomographyEstimator
+from .evaluators.match_quality import HomographyQualityEvaluator, RegrasQualidadeHomografia
 
 
 def carregarImagem(
@@ -63,7 +66,7 @@ def render(
     return img_ref_crop, bounds_crop, epsg, path_ref_geotiff
 
 
-def goodMatchesInLocation(
+def checkRegion(
     image_path: str,
     polygon_geom: QgsGeometry,
     reference_layer,
@@ -78,7 +81,7 @@ def goodMatchesInLocation(
     Todos os parâmetros operacionais vêm de `config`. 
     """
     if progress_callback: progress_callback(0, "Iniciando...")
-    if wasCanceled and wasCanceled(): return []
+    if wasCanceled and wasCanceled(): return
 
     # 1) Render da referência (usa config.render_width_px)
     if progress_callback: progress_callback(0, "Renderizando área de referência...")
@@ -90,38 +93,57 @@ def goodMatchesInLocation(
     )
     img_ref_gray = cv2.cvtColor(img_ref_crop, cv2.COLOR_BGR2GRAY)
 
-    if wasCanceled and wasCanceled(): return []
+    if wasCanceled and wasCanceled(): return
     
     # 2) Carregar imagem fonte
-    if progress_callback: progress_callback(20, "Carregando imagem de entrada...")
+    if progress_callback: progress_callback(10, "Carregando imagem de entrada...")
     img_original_gray = carregarImagem(image_path)
 
-    if wasCanceled and wasCanceled(): return []
+    if wasCanceled and wasCanceled(): return
 
     # 4) Detectar/Descrever
-    if progress_callback: progress_callback(40, "Detectando características (RootSIFT)...")
+    if progress_callback: progress_callback(20, "Detectando características (RootSIFT)...")
     detector = RootSIFTDetector()
     kp1, desc1 = detector.detect_and_compute(img_original_gray)
     kp2, desc2 = detector.detect_and_compute(img_ref_gray)
 
     if desc1 is None or desc2 is None or len(kp1) < config.min_features or len(kp2) < config.min_features:
-        raise ValueError(f"Descritores insuficientes: kp_src={len(kp1 or [])}, kp_ref={len(kp2 or [])}, "
-                        f"min_features={config.min_features}.")
+        return
 
-    if wasCanceled and wasCanceled(): return []
+    if wasCanceled and wasCanceled(): return
 
     # 5) Matching
-    if progress_callback: progress_callback(80, "Correspondendo características (FLANN)...")
+    if progress_callback: progress_callback(70, "Correspondendo características (FLANN)...")
     matcher = FLANNMatcher()
     desc_type = detector.descriptor_type
     desc1 = desc1.astype(desc_type)
     desc2 = desc2.astype(desc_type)
     good_matches, raw_matches = matcher.match(desc1, desc2, kp1, kp2)
 
-    if wasCanceled and wasCanceled(): return []
+    if len(good_matches) < config.search_min_features: return
+
+    if wasCanceled and wasCanceled(): return
+
+    # 6) Estimar Homografia (Strategy com parâmetros da config)
+    if progress_callback: progress_callback(85, "Estimando transformação (Homografia via Strategy)...")
+
+    pares: List[ParCorrespondencia] = [
+        ParCorrespondencia(
+            origem=Ponto2D(*kp1[m.queryIdx].pt),
+            referencia=Ponto2D(*kp2[m.trainIdx].pt)
+        ) for m in good_matches
+    ]
+
+    estimador = RansacHomographyEstimator(
+        reproj_threshold_px=config.ransac_reproj_thresh_px,
+        confidence=config.ransac_confidence
+    )
+    resultado = estimador.estimate(pares)
+
+    if resultado.H is None: return
 
     if progress_callback: progress_callback(100, "Pronto")
-    return good_matches
+    return resultado
 
 
 
