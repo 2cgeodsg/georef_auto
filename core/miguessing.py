@@ -1,20 +1,22 @@
+from os import stat
 from typing import Callable, List, Tuple
 
 from qgis.core import QgsCoordinateReferenceSystem, QgsGeometry, QgsRectangle
 
-from ..dependencies import rasterio
 from ..dependencies import numpy as np
 from ..dependencies import cv2
-from cv2.gapi import div
 
+from .models.image import Image
+from .models.reference import Reference
 from .config import GeoreferencingConfig
 from .detectors import RootSIFTDetector
 from .matchers.flann_matcher import FLANNMatcher
 from ..utils.process_logger import ProcessLogger
-from .render.render_reference import render_reference_image_to_spatial_resolution
+from .render.render_reference import render_reference_image_to_size, render_reference_image_to_spatial_resolution
 from .estimators.homography_base import ParCorrespondencia, Ponto2D
 from .estimators.homography_ransac import RansacHomographyEstimator
 from .evaluators.match_quality import HomographyQualityEvaluator, RegrasQualidadeHomografia
+from ..utils.reprojection_stats import reprojection_stats
 
 
 def carregarImagem(
@@ -39,11 +41,17 @@ def render(
     debug_output_dir: str = "C:/logsgeoref"
 ):
     if p_log: p_log.start("render_ref")
-    img_ref_crop, bounds_crop, epsg, path_ref_geotiff = render_reference_image_to_spatial_resolution(
+    # img_ref_crop, bounds_crop, epsg, path_ref_geotiff = render_reference_image_to_spatial_resolution(
+    #     reference_layer,
+    #     polygon_geom,
+    #     spatial_resolution=zoom_to_spatial_res(zoom_level),
+    #     spatial_resolution_crs=QgsCoordinateReferenceSystem("EPSG:3857"),
+    #     debug_output_dir=debug_output_dir
+    # )
+    img_ref_crop, bounds_crop, epsg, path_ref_geotiff = render_reference_image_to_size(
         reference_layer,
         polygon_geom,
-        spatial_resolution=zoom_to_spatial_res(zoom_level),
-        spatial_resolution_crs=QgsCoordinateReferenceSystem("EPSG:3857"),
+        width=2000,
         debug_output_dir=debug_output_dir
     )
     if p_log: p_log.end("render_ref")
@@ -66,8 +74,38 @@ def render(
     return img_ref_crop, bounds_crop, epsg, path_ref_geotiff
 
 
-def checkRegion(
+def descImg(
     image_path: str,
+    progress_callback=None,
+    config: GeoreferencingConfig = GeoreferencingConfig(),
+    wasCanceled=None
+):
+    """Calcula os desc e kp da imagem."""
+    # 1) Carregar imagem fonte
+    if wasCanceled and wasCanceled(): return
+    if progress_callback: progress_callback(0, "Carregando imagem de entrada...")
+    img_original_gray = carregarImagem(image_path)
+
+    # 2) Detectar/Descrever
+    if wasCanceled and wasCanceled(): return
+    if progress_callback: progress_callback(10, "Detectando características da entrada (RootSIFT)...")
+    detector = RootSIFTDetector()
+    kp, desc = detector.detect_and_compute(img_original_gray)
+
+    if desc is None or len(kp) < config.min_features:
+        return
+    
+    # 3) Casting?
+    if wasCanceled and wasCanceled(): return
+    if progress_callback: progress_callback(90, "Casting")
+    desc_type = detector.descriptor_type
+    desc = desc.astype(desc_type)
+    
+    image = Image(image_path, desc, kp)
+    return image
+
+
+def descRef(
     polygon_geom: QgsGeometry,
     reference_layer,
     zoom: int,
@@ -76,14 +114,9 @@ def checkRegion(
     config: GeoreferencingConfig = GeoreferencingConfig(),
     wasCanceled=None
 ):
-    """
-    Pipeline: render → detectar → match → retornar.
-    Todos os parâmetros operacionais vêm de `config`. 
-    """
-    if progress_callback: progress_callback(0, "Iniciando...")
+    """Calcula os desc e kp da referência."""
+    # 1) Render da referência
     if wasCanceled and wasCanceled(): return
-
-    # 1) Render da referência (usa config.render_width_px)
     if progress_callback: progress_callback(0, "Renderizando área de referência...")
     img_ref_crop, bounds_crop, epsg, path_ref_geotiff = render(
         polygon_geom,
@@ -93,57 +126,87 @@ def checkRegion(
     )
     img_ref_gray = cv2.cvtColor(img_ref_crop, cv2.COLOR_BGR2GRAY)
 
+    # 2) Detectar/Descrever
     if wasCanceled and wasCanceled(): return
-    
-    # 2) Carregar imagem fonte
-    if progress_callback: progress_callback(10, "Carregando imagem de entrada...")
-    img_original_gray = carregarImagem(image_path)
-
-    if wasCanceled and wasCanceled(): return
-
-    # 4) Detectar/Descrever
-    if progress_callback: progress_callback(20, "Detectando características (RootSIFT)...")
+    if progress_callback: progress_callback(10, "Detectando características (RootSIFT)...")
     detector = RootSIFTDetector()
-    kp1, desc1 = detector.detect_and_compute(img_original_gray)
-    kp2, desc2 = detector.detect_and_compute(img_ref_gray)
+    kp, desc = detector.detect_and_compute(img_ref_gray)
 
-    if desc1 is None or desc2 is None or len(kp1) < config.min_features or len(kp2) < config.min_features:
+    if desc is None or len(kp) < config.min_features:
         return
 
+    # 3) Casting?
     if wasCanceled and wasCanceled(): return
-
-    # 5) Matching
-    if progress_callback: progress_callback(70, "Correspondendo características (FLANN)...")
-    matcher = FLANNMatcher()
+    if progress_callback: progress_callback(90, "Casting")
     desc_type = detector.descriptor_type
-    desc1 = desc1.astype(desc_type)
-    desc2 = desc2.astype(desc_type)
-    good_matches, raw_matches = matcher.match(desc1, desc2, kp1, kp2)
+    desc = desc.astype(desc_type)
 
-    if len(good_matches) < config.search_min_features: return
+    ref = Reference(polygon_geom.boundingBox(), desc, kp)
+    return ref
 
-    if wasCanceled and wasCanceled(): return
 
-    # 6) Estimar Homografia (Strategy com parâmetros da config)
-    if progress_callback: progress_callback(85, "Estimando transformação (Homografia via Strategy)...")
 
-    pares: List[ParCorrespondencia] = [
-        ParCorrespondencia(
-            origem=Ponto2D(*kp1[m.queryIdx].pt),
-            referencia=Ponto2D(*kp2[m.trainIdx].pt)
-        ) for m in good_matches
-    ]
+def check(
+    image: Image,
+    reference: Reference,
+    progress_callback=None,
+    config: GeoreferencingConfig = GeoreferencingConfig(),
+    wasCanceled=None
+):
+    """
+    Pipeline: render → detectar → match → retornar.
+    Todos os parâmetros operacionais vêm de `config`. 
+    """
+    try:
+        # 3) Matching
+        if wasCanceled and wasCanceled(): return
+        if progress_callback: progress_callback(0, "Correspondendo características (FLANN)...")
+        matcher = FLANNMatcher()
+        good_matches, raw_matches = matcher.match(
+            image.descriptors, 
+            reference.descriptors, 
+            image.keypoints, 
+            reference.keypoints
+        )
 
-    estimador = RansacHomographyEstimator(
-        reproj_threshold_px=config.ransac_reproj_thresh_px,
-        confidence=config.ransac_confidence
-    )
-    resultado = estimador.estimate(pares)
 
-    if resultado.H is None: return
+        # 4) Estimar Homografia (Strategy com parâmetros da config)
+        if wasCanceled and wasCanceled(): return
+        if progress_callback: progress_callback(50, "Estimando transformação (Homografia via Strategy)...")
 
-    if progress_callback: progress_callback(100, "Pronto")
-    return resultado
+        pares: List[ParCorrespondencia] = [
+            ParCorrespondencia(
+                origem=Ponto2D(*image.keypoints[m.queryIdx].pt),
+                referencia=Ponto2D(*reference.keypoints[m.trainIdx].pt)
+            ) for m in good_matches
+        ]
+
+        estimador = RansacHomographyEstimator(
+            reproj_threshold_px=config.ransac_reproj_thresh_px,
+            confidence=config.ransac_confidence
+        )
+        resultado = estimador.estimate(pares)
+
+        # 5) Qualidade
+        avaliador = HomographyQualityEvaluator(
+                RegrasQualidadeHomografia(min_inliers=config.min_features, min_inlier_ratio=config.min_inlier_ratio)
+            )
+        aceito = avaliador.is_acceptable(resultado.n_inliers, resultado.n_corresp)
+        
+        # 6) Stats
+        mask = resultado.mascara_inliers
+        try:
+            stats = reprojection_stats(resultado.H, pares, mask)
+        except:
+            stats = {}
+        inliers = int(np.asarray(mask).ravel().sum()) if mask is not None else 0
+
+        if resultado.H is None: return
+
+        if progress_callback: progress_callback(100, "Pronto")
+        return aceito, resultado, pares, stats, inliers
+    except:
+        return
 
 
 

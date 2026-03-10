@@ -174,8 +174,11 @@ def georeference_image(
         if progress_callback: progress_callback(25, "Detectando características (RootSIFT)...")
         p_log.start("detect_describe")
         detector = RootSIFTDetector()
+        QApplication.processEvents()
         kp1, desc1 = detector.detect_and_compute(img_original_gray)
+        QApplication.processEvents()
         kp2, desc2 = detector.detect_and_compute(img_ref_gray)
+        QApplication.processEvents()
         p_log.end("detect_describe")
         p_log.log_kv(kp_src=len(kp1 or []), kp_ref=len(kp2 or []), detector="RootSIFT")
 

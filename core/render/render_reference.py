@@ -44,7 +44,7 @@ def _salvar_geotiff_temporario(
         debug_output_dir = r"C:\logsgeoref"
     os.makedirs(debug_output_dir, exist_ok=True)
 
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
     debug_filename = f"wms_ref_{timestamp}.tif"
     debug_path = os.path.join(debug_output_dir, debug_filename)
 
