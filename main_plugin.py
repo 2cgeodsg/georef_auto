@@ -3,9 +3,10 @@ from qgis.PyQt.QtGui import QIcon
 from qgis.PyQt.QtWidgets import QAction
 import os.path
 
-from .georef_auto_dialog import GeorefAutoDialog
+from .ui.main_dialog import GeorefAuto_refatoreDialog
+from .ui.preproc_dialog import GeorefPreprocDialog
 
-class GeorefAuto:
+class GeorefAuto_refatore:
     """QGIS Plugin for automatic georeferencing of aerial images"""
 
     def __init__(self, iface):
@@ -27,7 +28,7 @@ class GeorefAuto:
         locale_path = os.path.join(
             self.plugin_dir,
             'i18n',
-            'GeorefAuto_{}.qm'.format(locale))
+            'GeorefAuto_refatore_{}.qm'.format(locale))
 
         if os.path.exists(locale_path):
             self.translator = QTranslator()
@@ -41,7 +42,7 @@ class GeorefAuto:
         self.toolbar.setObjectName('AutomaticGeoreferencing')
         
         # Check if plugin was started the first time in current QGIS session
-        self.first_start = None
+        self.first_start_main = None
 
     def add_action(
         self,
@@ -105,15 +106,22 @@ class GeorefAuto:
     def initGui(self):
         """Create the menu entries and toolbar icons inside the QGIS GUI."""
 
-        icon_path = os.path.join(self.plugin_dir, 'icon.png')
+        icon_path = os.path.join(self.plugin_dir, 'assets', 'main_icon.png')
         self.add_action(
             icon_path,
             text="Automatic Georeferencing",
-            callback=self.run,
+            callback=self.run_main,
+            parent=self.iface.mainWindow())
+        preproc_icon_path = os.path.join(self.plugin_dir, 'assets', 'icone_preproc.png')
+        self.add_action(
+            preproc_icon_path,
+            text="Automatically Find Image MI",
+            callback=self.run_preproc,
             parent=self.iface.mainWindow())
 
         # will be set False in run()
-        self.first_start = True
+        self.first_start_main = True
+        self.first_start_preproc = True
 
     def unload(self):
         """Removes the plugin menu item and icon from QGIS GUI."""
@@ -125,14 +133,25 @@ class GeorefAuto:
         # remove the toolbar
         del self.toolbar
 
-    def run(self):
+    def run_main(self):
         """Run method that performs all the real work"""
 
         # Create the dialog with elements (after translation) and keep reference
         # Only create GUI ONCE in callback, so that it will only load when the plugin is started
-        if self.first_start:
-            self.first_start = False
-            self.dlg = GeorefAutoDialog(self.iface)
+        if self.first_start_main:
+            self.first_start_main = False
+            self.dlg = GeorefAuto_refatoreDialog(self.iface)
 
         # show the dialog
         self.dlg.show()
+    
+    def run_preproc(self):
+        """Run the method that performs all the real preprocessing"""
+
+        if self.first_start_preproc:
+            self.first_start_preproc = False
+            self.preproc_dlg = GeorefPreprocDialog(self.iface)
+        
+        self.preproc_dlg.show()
+        
+        

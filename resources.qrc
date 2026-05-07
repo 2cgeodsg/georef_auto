@@ -1,5 +1,5 @@
 <!DOCTYPE qgis-resource-file>
 <qgis-resource-file>
-  <qresource prefix="/plugins/georef_auto">
+  <qresource prefix="/plugins/GeorefAuto_refatorev2_4">
   </qresource>
 </qgis-resource-file>
