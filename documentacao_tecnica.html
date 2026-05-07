@@ -1,0 +1,1335 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GeorefAuto — Documentação Técnica (dev-alvarez)</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1d27;
+      --surface2: #22263a;
+      --accent: #4f8ef7;
+      --accent2: #7c5cbf;
+      --green: #3ecf8e;
+      --orange: #f5a623;
+      --red: #e04040;
+      --text: #d4d9f0;
+      --muted: #7a8099;
+      --border: #2d3250;
+      --code-bg: #131620;
+      --nav-w: 270px;
+    }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.65;
+      display: flex;
+    }
+
+    /* ── Sidenav ────────────────────────────────────────────────────────── */
+    nav#sidenav {
+      position: fixed; top: 0; left: 0; bottom: 0;
+      width: var(--nav-w);
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      overflow-y: auto;
+      padding: 1.5rem 0;
+      z-index: 100;
+    }
+    nav#sidenav .logo {
+      padding: 0 1.2rem 1.2rem;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 1rem;
+    }
+    nav#sidenav .logo h2 {
+      font-size: 1.1rem;
+      color: var(--accent);
+      font-weight: 700;
+    }
+    nav#sidenav .logo .branch-badge {
+      display: inline-block;
+      margin-top: .3rem;
+      font-size: .72rem;
+      background: #2d1f5e;
+      color: #a78bfa;
+      border: 1px solid #5b44a0;
+      border-radius: 20px;
+      padding: .15rem .6rem;
+      font-weight: 600;
+      letter-spacing: .05em;
+    }
+    nav#sidenav a {
+      display: block;
+      padding: .38rem 1.2rem;
+      color: var(--muted);
+      text-decoration: none;
+      font-size: .83rem;
+      transition: color .15s, background .15s;
+      border-left: 3px solid transparent;
+    }
+    nav#sidenav a:hover, nav#sidenav a.active {
+      color: var(--text);
+      background: var(--surface2);
+      border-left-color: var(--accent);
+    }
+    nav#sidenav .nav-section {
+      font-size: .7rem;
+      font-weight: 700;
+      letter-spacing: .1em;
+      color: var(--muted);
+      padding: 1rem 1.2rem .3rem;
+      text-transform: uppercase;
+    }
+
+    /* ── Main Content ───────────────────────────────────────────────────── */
+    main {
+      margin-left: var(--nav-w);
+      flex: 1;
+      max-width: 1000px;
+      padding: 3rem 3rem 6rem;
+    }
+
+    /* ── Hero ───────────────────────────────────────────────────────────── */
+    .hero {
+      background: linear-gradient(135deg, #0e1a40 0%, #1a0e40 100%);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 3rem 3.5rem;
+      margin-bottom: 3rem;
+      position: relative;
+      overflow: hidden;
+    }
+    .hero::before {
+      content: '';
+      position: absolute;
+      top: -80px; right: -80px;
+      width: 300px; height: 300px;
+      background: radial-gradient(circle, rgba(79,142,247,.15) 0%, transparent 70%);
+      border-radius: 50%;
+    }
+    .hero h1 { font-size: 2.2rem; font-weight: 800; color: #fff; }
+    .hero .tagline { color: var(--muted); font-size: 1.05rem; margin-top: .5rem; }
+    .hero .badges { margin-top: 1.5rem; display: flex; gap: .6rem; flex-wrap: wrap; }
+    .badge {
+      display: inline-flex; align-items: center; gap: .3rem;
+      padding: .25rem .75rem; border-radius: 20px; font-size: .78rem; font-weight: 600;
+    }
+    .badge-blue   { background: #1a2a5e; color: #7eb3ff; border: 1px solid #2d4080; }
+    .badge-purple { background: #2d1f5e; color: #c4a8ff; border: 1px solid #5b44a0; }
+    .badge-green  { background: #0e3328; color: #5fe8b0; border: 1px solid #1a6650; }
+    .badge-orange { background: #3d2500; color: #ffb347; border: 1px solid #7a4f00; }
+
+    /* ── Sections ───────────────────────────────────────────────────────── */
+    section { margin-bottom: 3rem; }
+    h2 {
+      font-size: 1.55rem; font-weight: 700; color: #fff;
+      padding-bottom: .5rem;
+      border-bottom: 2px solid var(--border);
+      margin-bottom: 1.5rem;
+    }
+    h3 { font-size: 1.1rem; font-weight: 700; color: var(--accent); margin: 1.5rem 0 .6rem; }
+    h4 { font-size: .95rem; font-weight: 700; color: var(--orange); margin: 1.2rem 0 .4rem; }
+    p { margin-bottom: .9rem; color: var(--text); }
+
+    /* ── Cards ──────────────────────────────────────────────────────────── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.4rem 1.6rem;
+      margin-bottom: 1.2rem;
+    }
+    .card-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+    }
+    .card-grid .card { margin: 0; }
+    .card .label { font-size: .72rem; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); margin-bottom: .4rem; }
+    .card .value { font-size: 1.8rem; font-weight: 700; color: var(--accent); }
+    .card .desc { font-size: .82rem; color: var(--muted); margin-top: .3rem; }
+
+    /* ── Code ───────────────────────────────────────────────────────────── */
+    pre, code {
+      font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+      font-size: .83rem;
+    }
+    pre {
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.2rem 1.4rem;
+      overflow-x: auto;
+      margin: .8rem 0 1.2rem;
+      line-height: 1.5;
+    }
+    code { background: var(--code-bg); padding: .1em .35em; border-radius: 4px; color: #a8d8ff; }
+
+    /* ── Tables ─────────────────────────────────────────────────────────── */
+    .table-wrap { overflow-x: auto; margin: 1rem 0 1.5rem; }
+    table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+    th {
+      background: var(--surface2);
+      color: var(--accent);
+      font-weight: 700;
+      padding: .65rem 1rem;
+      text-align: left;
+      border-bottom: 2px solid var(--border);
+    }
+    td {
+      padding: .6rem 1rem;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+    tr:hover td { background: rgba(79,142,247,.04); }
+
+    /* ── Pipeline Steps ─────────────────────────────────────────────────── */
+    .pipeline { list-style: none; }
+    .pipeline li {
+      display: flex;
+      gap: 1rem;
+      padding: .9rem 0;
+      border-bottom: 1px solid var(--border);
+      align-items: flex-start;
+    }
+    .step-num {
+      min-width: 32px; height: 32px;
+      background: var(--accent2);
+      color: #fff;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: .8rem; font-weight: 800;
+      flex-shrink: 0;
+    }
+    .step-content .step-title { font-weight: 700; color: var(--text); }
+    .step-content .step-detail { font-size: .83rem; color: var(--muted); margin-top: .2rem; }
+
+    /* ── Alert boxes ────────────────────────────────────────────────────── */
+    .alert {
+      border-radius: 8px;
+      padding: 1rem 1.2rem;
+      margin: 1rem 0;
+      font-size: .88rem;
+      border-left: 4px solid;
+    }
+    .alert-blue   { background: rgba(79,142,247,.08); border-color: var(--accent); }
+    .alert-green  { background: rgba(62,207,142,.08); border-color: var(--green); }
+    .alert-orange { background: rgba(245,166,35,.08); border-color: var(--orange); }
+    .alert-red    { background: rgba(224,64,64,.08);  border-color: var(--red); }
+
+    /* ── Metric chips ───────────────────────────────────────────────────── */
+    .metric-chip {
+      display: inline-block;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: .15rem .55rem;
+      font-size: .78rem;
+      color: var(--green);
+      margin: .1rem .15rem;
+      font-family: monospace;
+    }
+
+    /* ── Dir tree ───────────────────────────────────────────────────────── */
+    .dir-tree {
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.2rem 1.4rem;
+      font-family: monospace;
+      font-size: .82rem;
+      line-height: 1.7;
+      color: var(--text);
+    }
+    .dir-tree .dir  { color: #7eb3ff; }
+    .dir-tree .file { color: #a8d8ff; }
+    .dir-tree .note { color: var(--muted); }
+
+    /* ── Scrollbar ──────────────────────────────────────────────────────── */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: var(--bg); }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  </style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════ SIDENAV -->
+<nav id="sidenav">
+  <div class="logo">
+    <h2>GeorefAuto</h2>
+    <span class="branch-badge">⎇ dev-alvarez</span>
+  </div>
+
+  <span class="nav-section">Visão Geral</span>
+  <a href="#visao-geral">Propósito e Valor</a>
+  <a href="#arquitetura">Arquitetura do Módulo</a>
+  <a href="#bibliotecas">Bibliotecas Utilizadas</a>
+
+  <span class="nav-section">Configuração</span>
+  <a href="#config">GeoreferencingConfig</a>
+  <a href="#metricas-globais">Métricas Globais</a>
+
+  <span class="nav-section">Pipeline Principal</span>
+  <a href="#pipeline">13 Etapas do Pipeline</a>
+  <a href="#detectors">Detectores (Strategy)</a>
+  <a href="#matchers">Matchers (Strategy)</a>
+  <a href="#ransac">Homografia RANSAC</a>
+  <a href="#quality">Avaliador de Qualidade</a>
+  <a href="#reprojerr">Erro de Reprojeção</a>
+
+  <span class="nav-section">Processamento de Imagem</span>
+  <a href="#warp">Warp Perspectivo</a>
+  <a href="#geo">Extração de Extensão Geo</a>
+  <a href="#save">Salvar GeoTIFF</a>
+  <a href="#logger">ProcessLogger</a>
+
+  <span class="nav-section">Módulos Avançados</span>
+  <a href="#mosaic">Pipeline de Mosaico</a>
+  <a href="#miguessing">MI Guessing</a>
+  <a href="#render">Renderização de Referência</a>
+
+  <span class="nav-section">Análise e Roadmap</span>
+  <a href="#tabela-metricas">Tabela de Métricas</a>
+  <a href="#roadmap">Próximos Passos</a>
+</nav>
+
+<!-- ═══════════════════════════════════════════════════════ MAIN -->
+<main>
+
+<!-- ── HERO ─────────────────────────────────────────────────────── -->
+<div class="hero">
+  <h1>GeorefAuto</h1>
+  <p class="tagline">Plugin QGIS para georreferenciamento automático de imagens aéreas históricas usando visão computacional</p>
+  <div class="badges">
+    <span class="badge badge-purple">⎇ dev-alvarez</span>
+    <span class="badge badge-blue">Python 3.10+</span>
+    <span class="badge badge-blue">QGIS 3.x</span>
+    <span class="badge badge-green">OpenCV 4.x</span>
+    <span class="badge badge-green">RootSIFT + FLANN + RANSAC</span>
+    <span class="badge badge-orange">Strategy Pattern</span>
+    <span class="badge badge-orange">13-Step Pipeline</span>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════
+     VISÃO GERAL
+     ════════════════════════════════════════════════════════════════ -->
+<section id="visao-geral">
+  <h2>Propósito e Valor Histórico</h2>
+
+  <p>O <strong>GeorefAuto</strong> é um plugin QGIS que automatiza o georreferenciamento de fotografias aéreas analógicas digitalizadas — imagens produzidas entre as décadas de 1940 e 1990 por câmeras métricas instaladas em aeronaves. Esses arquivos fotogramétricos constituem o único registro visual de regiões antes da era do sensoriamento remoto digital, documentando paisagens, ocupações e transformações urbanas e rurais que não existem mais.</p>
+
+  <p>O processo tradicional de georreferenciamento exige que técnicos identifiquem manualmente pontos de controle terrestres (GCPs) em cada fotografia, tarefa que pode levar horas por imagem e é impraticável para acervos com dezenas de milhares de fotogramas. O GeorefAuto resolve esse problema ao comparar automaticamente a fotografia digitalizada com uma camada de referência geográfica moderna (ex.: imagem de satélite, ortofoto) usando algoritmos de visão computacional.</p>
+
+  <div class="card-grid">
+    <div class="card">
+      <div class="label">Detector Principal</div>
+      <div class="value" style="font-size:1.3rem">RootSIFT</div>
+      <div class="desc">SIFT com normalização L1 + raiz quadrada — invariante a escala, rotação e iluminação</div>
+    </div>
+    <div class="card">
+      <div class="label">Matcher</div>
+      <div class="value" style="font-size:1.3rem">FLANN KNN</div>
+      <div class="desc">Fast Library for Approximate Nearest Neighbors com Lowe's Ratio Test 0.75</div>
+    </div>
+    <div class="card">
+      <div class="label">Estimador</div>
+      <div class="value" style="font-size:1.3rem">RANSAC</div>
+      <div class="desc">Homografia 3×3 robusta com limiar de reprojeção 5.0 px e confiança 0.995</div>
+    </div>
+    <div class="card">
+      <div class="label">Saída</div>
+      <div class="value" style="font-size:1.3rem">GeoTIFF</div>
+      <div class="desc">~1 m/pixel, JPEG compressão, overviews 2×/4×/8×/16×, CRS herdado da referência</div>
+    </div>
+  </div>
+
+  <div class="alert alert-green">
+    <strong>Impacto prático:</strong> Um acervo de 500 imagens que levaria meses de trabalho manual pode ser processado em lote em horas, com cada imagem resultando em um GeoTIFF pronto para uso em SIG, análise de mudança de uso do solo, estudos de cheias históricas e planejamento urbano.
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════════
+     ARQUITETURA
+     ════════════════════════════════════════════════════════════════ -->
+<section id="arquitetura">
+  <h2>Arquitetura do Módulo <code>core/</code></h2>
+
+  <p>A branch <strong>dev-alvarez</strong> reorganiza completamente a base de código, separando responsabilidades em subpacotes especializados e introduzindo o padrão <em>Strategy</em> para detectores e matchers.</p>
+
+  <div class="dir-tree">
+<span class="dir">core/</span>
+├── <span class="file">config.py</span>          <span class="note"># GeoreferencingConfig — dataclass frozen com todos os parâmetros</span>
+├── <span class="file">georeferencing.py</span>  <span class="note"># Pipeline principal (13 etapas)</span>
+├── <span class="file">miguessing.py</span>      <span class="note"># MI Guessing — busca por localização por grid</span>
+│
+├── <span class="dir">detectors/</span>
+│   ├── <span class="file">base.py</span>        <span class="note"># ABC BaseDetector</span>
+│   ├── <span class="file">rootsift.py</span>    <span class="note"># RootSIFTDetector</span>
+│   ├── <span class="file">akaze.py</span>       <span class="note"># AKAZEDetector (alternativo)</span>
+│   ├── <span class="file">orb.py</span>         <span class="note"># ORBDetector (alternativo)</span>
+│   └── <span class="file">manager.py</span>     <span class="note"># DetectorManager — fallback chain</span>
+│
+├── <span class="dir">matchers/</span>
+│   ├── <span class="file">base.py</span>        <span class="note"># ABC BaseMatcher</span>
+│   ├── <span class="file">flann_matcher.py</span>  <span class="note"># FLANNMatcher</span>
+│   └── <span class="file">bf_matcher.py</span>  <span class="note"># BFMatcher (alternativo)</span>
+│
+├── <span class="dir">estimators/</span>
+│   ├── <span class="file">homography_base.py</span>   <span class="note"># ParCorrespondencia, Ponto2D, ResultadoHomografia</span>
+│   └── <span class="file">homography_ransac.py</span> <span class="note"># RansacHomographyEstimator</span>
+│
+├── <span class="dir">evaluators/</span>
+│   └── <span class="file">match_quality.py</span>  <span class="note"># HomographyQualityEvaluator + RegrasQualidadeHomografia</span>
+│
+├── <span class="dir">models/</span>
+│   ├── <span class="file">image.py</span>       <span class="note"># dataclass Image (path, descriptors, keypoints)</span>
+│   └── <span class="file">reference.py</span>   <span class="note"># dataclass Reference (bbox, descriptors, keypoints)</span>
+│
+├── <span class="dir">image_processing/</span>
+│   ├── <span class="file">crop.py</span>        <span class="note"># cortar_bordas_pretas</span>
+│   ├── <span class="file">geo.py</span>         <span class="note"># ExtensaoGeo, calcular_extensao_geo</span>
+│   ├── <span class="file">save_geotiff.py</span>  <span class="note"># ReamostragemConfig, salvar_geotiff_com_overviews</span>
+│   └── <span class="file">warp.py</span>        <span class="note"># aplicar_warp_perspective</span>
+│
+├── <span class="dir">mosaic/</span>
+│   ├── <span class="file">config.py</span>      <span class="note"># MosaicConfig</span>
+│   └── <span class="file">pipeline.py</span>    <span class="note"># gerar_mosaicos_nao_georef (pipeline multi-etapa)</span>
+│
+├── <span class="dir">render/</span>
+│   └── <span class="file">render_reference.py</span>  <span class="note"># render_reference_image_to_size / _to_spatial_resolution</span>
+│
+└── <span class="dir">utils/</span>
+    ├── <span class="file">logger.py</span>         <span class="note"># logger global</span>
+    ├── <span class="file">process_logger.py</span> <span class="note"># ProcessLogger — log estruturado K=V com timers</span>
+    └── <span class="file">reprojection_stats.py</span>  <span class="note"># reprojection_stats — RMS, P50, P95</span>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════════
+     BIBLIOTECAS
+     ════════════════════════════════════════════════════════════════ -->
+<section id="bibliotecas">
+  <h2>Bibliotecas Utilizadas</h2>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Biblioteca</th><th>Versão mín.</th><th>Papel no Plugin</th><th>Por que foi escolhida</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>OpenCV</strong> (<code>opencv-contrib-python</code>)</td>
+          <td>4.5+</td>
+          <td>Detecção SIFT/AKAZE/ORB, matching FLANN/BF, homografia RANSAC, warp perspectivo, compressão JPEG</td>
+          <td>Implementação de referência em C++ com bindings Python; única biblioteca com SIFT patenteado liberado pós-2020</td>
+        </tr>
+        <tr>
+          <td><strong>NumPy</strong></td>
+          <td>1.21+</td>
+          <td>Álgebra linear (normalização RootSIFT), manipulação de matrizes de keypoints/descritores, cálculo de máscaras RANSAC</td>
+          <td>Padrão de fato para computação numérica em Python; integração nativa com OpenCV</td>
+        </tr>
+        <tr>
+          <td><strong>Rasterio</strong></td>
+          <td>1.3+</td>
+          <td>Escrita de GeoTIFF com metadados CRS, transform afim, nodata, compressão JPEG, geração de overviews</td>
+          <td>API Pythonica superior ao GDAL puro; suporte nativo a operações de I/O vetorizadas</td>
+        </tr>
+        <tr>
+          <td><strong>QGIS Python API</strong> (<code>qgis.core</code>)</td>
+          <td>3.16+</td>
+          <td>Renderização de camadas de referência, CRS, geometria de polígono, ferramentas de canvas interativo</td>
+          <td>Integração obrigatória com a plataforma host do plugin</td>
+        </tr>
+        <tr>
+          <td><strong>PyQt5</strong></td>
+          <td>5.15+</td>
+          <td>Interface gráfica, diálogos de progresso, emissão de sinais, processamento de eventos durante laços longos</td>
+          <td>Framework UI nativo do QGIS; permite responsividade da UI durante processamento</td>
+        </tr>
+        <tr>
+          <td><strong>psutil</strong></td>
+          <td>5.9+</td>
+          <td>Verificação de RAM disponível antes de criar mosaicos grandes (<em>preflight</em>)</td>
+          <td>Única forma portável de consultar memória do sistema sem chamadas de sistema diretas</td>
+        </tr>
+        <tr>
+          <td><strong>gc</strong> (stdlib)</td>
+          <td>—</td>
+          <td>Coleta de lixo forçada após liberar imagens grandes no pipeline de mosaico</td>
+          <td>Controle explícito de memória para imagens de vários GB</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════════
+     CONFIG
+     ════════════════════════════════════════════════════════════════ -->
+<section id="config">
+  <h2>GeoreferencingConfig — Centro de Controle do Pipeline</h2>
+
+  <p>Todo parâmetro operacional do pipeline é centralizado em um único <code>dataclass(frozen=True)</code>, garantindo imutabilidade em tempo de execução e facilitando testes parametrizados.</p>
+
+<pre>
+@dataclass(frozen=True)
+class GeoreferencingConfig:
+    # Renderização da referência
+    render_width_px: int   = 2000       # largura do raster de referência em pixels
+
+    # RANSAC
+    ransac_reproj_thresh_px: float = 5.0  # erro máximo em px para ser inlier
+    ransac_confidence: float = 0.995      # probabilidade de resultado sem outliers
+
+    # Reamostragem de saída
+    warp_interpolation: int = 3           # cv2.INTER_CUBIC
+    target_resolution: float = 1.0       # metros/pixel no GeoTIFF final
+    resampling: str = "cubic"
+    clamp_upsampling: bool = False        # evita upsampling excessivo
+
+    # Qualidade mínima
+    min_features: int = 8                 # mínimo de inliers/keypoints aceitáveis
+    min_inlier_ratio: float = 0.25        # mínimo de 25% de inliers sobre matches
+
+    # Validação de polígono
+    max_polygon_area_km2: float = 3450.0  # bloqueia execução acima deste limite
+    warn_polygon_area_km2: float = 1500.0 # aviso de aviso (área grande)
+
+    # MI Guessing (busca por localização)
+    search_division: int = 20             # divisões por eixo na grade de busca
+    search_min_features: int = 1          # mínimo de features para aceitar tile de busca
+</pre>
+
+  <div class="alert alert-blue">
+    O uso de <code>frozen=True</code> garante que a configuração não pode ser modificada acidentalmente durante o pipeline. Para usar parâmetros diferentes, instancie um novo objeto: <code>GeoreferencingConfig(min_features=12, ransac_reproj_thresh_px=3.0)</code>.
+  </div>
+
+  <h3>Parâmetros Críticos e Seus Efeitos</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Parâmetro</th><th>Valor padrão</th><th>Efeito se aumentado</th><th>Efeito se diminuído</th></tr></thead>
+      <tbody>
+        <tr><td><code>ransac_reproj_thresh_px</code></td><td>5.0 px</td><td>Mais inliers aceitos (menos preciso)</td><td>Menos inliers (mais preciso mas pode falhar)</td></tr>
+        <tr><td><code>ransac_confidence</code></td><td>0.995</td><td>Mais iterações RANSAC (mais lento, mais robusto)</td><td>Menos iterações (mais rápido, menos confiável)</td></tr>
+        <tr><td><code>min_features</code></td><td>8</td><td>Mais imagens rejeitadas (mais conservador)</td><td>Mais imagens aceitas (risco de georreferenciamentos ruins)</td></tr>
+        <tr><td><code>min_inlier_ratio</code></td><td>0.25</td><td>Exige matches de alta qualidade</td><td>Aceita resultados com muitos outliers</td></tr>
+        <tr><td><code>target_resolution</code></td><td>1.0 m/px</td><td>GeoTIFF menor, mais processamento para chegar lá</td><td>GeoTIFF maior, menor qualidade visual</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════════
+     MÉTRICAS GLOBAIS
+     ════════════════════════════════════════════════════════════════ -->
+<section id="metricas-globais">
+  <h2>Métricas Monitoradas pelo Pipeline</h2>
+
+  <div class="card-grid">
+    <div class="card"><div class="label">kp_src</div><div class="value" style="font-size:1.1rem">Keypoints</div><div class="desc">Pontos de interesse detectados na imagem de entrada (fotografia histórica)</div></div>
+    <div class="card"><div class="label">kp_ref</div><div class="value" style="font-size:1.1rem">Keypoints</div><div class="desc">Pontos de interesse detectados na imagem de referência renderizada</div></div>
+    <div class="card"><div class="label">matches_raw</div><div class="value" style="font-size:1.1rem">Matches</div><div class="desc">Total de correspondências brutas antes do Lowe's Ratio Test</div></div>
+    <div class="card"><div class="label">matches_good</div><div class="value" style="font-size:1.1rem">Matches</div><div class="desc">Correspondências aprovadas no Lowe's Ratio Test (ratio &lt; 0.75)</div></div>
+    <div class="card"><div class="label">inliers</div><div class="value" style="font-size:1.1rem">Inliers</div><div class="desc">Matches validados pelo RANSAC (dentro do limiar de reprojeção)</div></div>
+    <div class="card"><div class="label">inlier_ratio</div><div class="value" style="font-size:1.1rem">Razão</div><div class="desc">inliers / matches_good — qualidade relativa da homografia</div></div>
+    <div class="card"><div class="label">reproj_rms</div><div class="value" style="font-size:1.1rem">px (RMS)</div><div class="desc">Erro quadrático médio de reprojeção dos inliers — precisão da homografia</div></div>
+    <div class="card"><div class="label">reproj_median</div><div class="value" style="font-size:1.1rem">px (P50)</div><div class="desc">Mediana do erro de reprojeção — menos sensível a outliers que o RMS</div></div>
+    <div class="card"><div class="label">reproj_p95</div><div class="value" style="font-size:1.1rem">px (P95)</div><div class="desc">Percentil 95 do erro — representa o pior caso esperado para 95% dos pontos</div></div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════════
+     PIPELINE PRINCIPAL
+     ════════════════════════════════════════════════════════════════ -->
+<section id="pipeline">
+  <h2>Pipeline Principal — 13 Etapas</h2>
+
+  <p>A função <code>georeference_image()</code> em <code>core/georeferencing.py</code> orquestra todas as etapas, usando o <code>ProcessLogger</code> para cronometrar cada fase. Abaixo está a sequência completa com métricas geradas em cada etapa.</p>
+
+  <ol class="pipeline">
+    <li>
+      <div class="step-num">1</div>
+      <div class="step-content">
+        <div class="step-title">Renderização da Imagem de Referência</div>
+        <div class="step-detail"><code>render_reference_image_to_size(layer, polygon_geom, width=2000)</code> — renderiza a camada QGIS selecionada na extensão do polígono desenhado, em 2000 px de largura. Salva um GeoTIFF de debug temporário. <span class="metric-chip">timer: render_ref</span></div>
+      </div>
+    </li>
+    <li>
+      <div class="step-num">2</div>
+      <div class="step-content">
+        <div class="step-title">Carregamento da Imagem de Entrada</div>
+        <div class="step-detail"><code>cv2.imread(image_path, cv2.IMREAD_COLOR)</code> — carrega o fotograma histórico digitalizado em BGR. <span class="metric-chip">timer: load_input</span></div>
+      </div>
+    </li>
+    <li>
+      <div class="step-num">3</div>
+      <div class="step-content">
+        <div class="step-title">Conversão para Escala de Cinza</div>
+        <div class="step-detail"><code>cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)</code> para as duas imagens. Descritores de imagem trabalham em escala de cinza para independência de canais de cor.</div>
+      </div>
+    </li>
+    <li>
+      <div class="step-num">4</div>
+      <div class="step-content">
+        <div class="step-title">Detecção e Descrição de Keypoints</div>
+        <div class="step-detail"><code>detector.detect_and_compute()</code> — aplica RootSIFT (ou outro detector via Strategy). Gera keypoints e descritores para as duas imagens. <span class="metric-chip">kp_src</span> <span class="metric-chip">kp_ref</span> <span class="metric-chip">timer: detect_src + detect_ref</span></div>
+      </div>
+    </li>
+    <li>
+      <div class="step-num">5</div>
+      <div class="step-content">
+        <div class="step-title">Correspondência de Features (Matching)</div>
+        <div class="step-detail"><code>matcher.match(desc1, desc2, kp1, kp2)</code> — FLANNMatcher com KNN k=2 e Lowe's Ratio Test 0.75. Retorna <code>good_matches</code> e <code>raw_matches</code>. <span class="metric-chip">matches_raw</span> <span class="metric-chip">matches_good</span> <span class="metric-chip">timer: match</span></div>
+      </div>
+    </li>
+    <li>
+      <div class="step-num">6</div>
+      <div class="step-content">
+        <div class="step-title">Estimação de Homografia via RANSAC</div>
+        <div class="step-detail"><code>RansacHomographyEstimator.estimate(pares)</code> — converte good_matches em pares de coordenadas e estima a matriz H 3×3. Retorna <code>ResultadoHomografia</code> com H, máscara de inliers e contagens. <span class="metric-chip">inliers</span> <span class="metric-chip">timer: ransac</span></div>
+      </div>
+    </li>
+    <li>
+      <div class="step-num">7</div>
+      <div class="step-content">
+        <div class="step-title">Avaliação de Qualidade</div>
+        <div class="step-detail"><code>HomographyQualityEvaluator.is_acceptable(n_inliers, n_total)</code> — duplo critério: <strong>inliers ≥ 8</strong> E <strong>ratio ≥ 25%</strong>. Se não aceito, lança exceção com mensagem diagnóstica. <span class="metric-chip">inlier_ratio</span></div>
+      </div>
+    </li>
+    <li>
+      <div class="step-num">8</div>
+      <div class="step-content">
+        <div class="step-title">Cálculo do Erro de Reprojeção</div>
+        <div class="step-detail"><code>reprojection_stats(H, pares, mascara)</code> — calcula RMS, mediana e P95 do erro em pixels para os inliers. Métricas de qualidade geométrica da transformação. <span class="metric-chip">reproj_rms</span> <span class="metric-chip">reproj_median</span> <span class="metric-chip">reproj_p95</span></div>
+      </div>
+    </li>
+    <li>
+      <div class="step-num">9</div>
+      <div class="step-content">
+        <div class="step-title">Warp Perspectivo</div>
+        <div class="step-detail"><code>aplicar_warp_perspective(img_src, H, size_ref, interpolation=INTER_CUBIC)</code> — projeta a imagem de entrada no espaço da referência. Resultado tem o mesmo tamanho e perspectiva da referência renderizada. <span class="metric-chip">timer: warp</span></div>
+      </div>
+    </li>
+    <li>
+      <div class="step-num">10</div>
+      <div class="step-content">
+        <div class="step-title">Corte de Bordas Pretas</div>
+        <div class="step-detail"><code>cortar_bordas_pretas(warped)</code> — detecta pixels não-zero e encontra o bounding box do conteúdo real, eliminando bordas introduzidas pelo warp. Retorna imagem e coordenadas do crop. <span class="metric-chip">timer: crop</span></div>
+      </div>
+    </li>
+    <li>
+      <div class="step-num">11</div>
+      <div class="step-content">
+        <div class="step-title">Cálculo da Extensão Geográfica</div>
+        <div class="step-detail"><code>calcular_extensao_geo(bounds_ref, warped_shape, crop_coords)</code> — transforma as coordenadas do crop de pixels para coordenadas geográficas usando a resolução da referência. Retorna <code>ExtensaoGeo</code> com xmin, ymax, xres, yres e EPSG. <span class="metric-chip">timer: geo_calc</span></div>
+      </div>
+    </li>
+    <li>
+      <div class="step-num">12</div>
+      <div class="step-content">
+        <div class="step-title">Reamostragem e Salvar GeoTIFF</div>
+        <div class="step-detail"><code>salvar_geotiff_com_overviews(img, extensao, output_path, cfg)</code> — reamostrar para ~1 m/pixel (INTER_CUBIC), salva com rasterio, aplica compressão JPEG quality 85 e constrói overviews 2×/4×/8×/16× para uso eficiente em SIG. <span class="metric-chip">timer: save</span></div>
+      </div>
+    </li>
+    <li>
+      <div class="step-num">13</div>
+      <div class="step-content">
+        <div class="step-title">Persistência do Log de Processo</div>
+        <div class="step-detail"><code>p_log.write_to_file(log_dir)</code> — escreve o log estruturado K=V com todos os timers e métricas em arquivo JSON na pasta de debug. Remove GeoTIFF temporário da referência.</div>
+      </div>
+    </li>
+  </ol>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════════
+     DETECTORES
+     ════════════════════════════════════════════════════════════════ -->
+<section id="detectors">
+  <h2>Detectores de Keypoints — Padrão Strategy</h2>
+
+  <p>O dev-alvarez introduz um ABC <code>BaseDetector</code> que define a interface de todos os detectores. O <code>DetectorManager</code> implementa um mecanismo de <em>fallback chain</em>: tenta RootSIFT primeiro, e se falhar (ex.: poucos keypoints), tenta AKAZE, depois ORB.</p>
+
+<pre>
+class BaseDetector(ABC):
+    @abstractmethod
+    def detect_and_compute(self, image_gray: np.ndarray) -> Tuple[List, Optional[np.ndarray]]:
+        ...
+
+    @property
+    @abstractmethod
+    def descriptor_type(self) -> np.dtype:
+        ...
+</pre>
+
+  <h3>RootSIFTDetector</h3>
+  <p>Detector principal. Aplica normalização RootSIFT sobre os descritores SIFT de 128 dimensões:</p>
+<pre>
+sift = cv2.SIFT_create()
+kps, desc = sift.detectAndCompute(gray, None)
+# Normalização L1
+desc /= (desc.sum(axis=1, keepdims=True) + 1e-7)
+# Distância de Hellinger via raiz quadrada
+desc = np.sqrt(desc)
+</pre>
+
+  <div class="alert alert-blue">
+    <strong>Por que RootSIFT?</strong> O SIFT padrão usa distância Euclidiana (L2) entre descritores. A normalização L1 + raiz quadrada converte isso para a distância de Hellinger, provada superior para dados de histograma (como os descritores SIFT). Isso é especialmente importante para imagens históricas digitalizadas de filme, que têm características diferentes de imagens digitais modernas.
+  </div>
+
+  <h3>AKAZEDetector</h3>
+  <p>Alternativo mais robusto em regiões com texturas complexas (ex.: áreas urbanas densas). Usa descritores binários (M-LDB) e é invariante a transformações não-lineares suaves. Threshold configurável: <code>0.001</code> (quanto menor, mais keypoints detectados).</p>
+
+  <h3>ORBDetector</h3>
+  <p>Alternativo mais rápido, baseado em FAST + BRIEF. Útil como último recurso em imagens com poucos features. Detecta até <code>n_features=5000</code> por padrão.</p>
+
+  <h3>DetectorManager — Fallback Chain</h3>
+<pre>
+class DetectorManager:
+    def __init__(self, detectors=[RootSIFTDetector(), AKAZEDetector(), ORBDetector()]):
+        self.detectors = detectors
+
+    def detect_and_compute(self, image_gray):
+        for detector in self.detectors:
+            kps, desc = detector.detect_and_compute(image_gray)
+            if desc is not None and len(kps) >= MIN_THRESHOLD:
+                return kps, desc
+        return [], None
+</pre>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════════
+     MATCHERS
+     ════════════════════════════════════════════════════════════════ -->
+<section id="matchers">
+  <h2>Matchers — Correspondência de Descritores</h2>
+
+  <h3>FLANNMatcher (principal)</h3>
+  <p>Usa o algoritmo KD-Tree (FLANN) com <code>trees=5</code> e <code>checks=50</code> para encontrar os 2 vizinhos mais próximos de cada descritor. O <strong>Lowe's Ratio Test</strong> filtra correspondências ambíguas:</p>
+
+<pre>
+index_params = dict(algorithm=1, trees=5)      # FLANN_INDEX_KDTREE
+search_params = dict(checks=50)
+matcher = cv2.FlannBasedMatcher(index_params, search_params)
+matches = matcher.knnMatch(desc1, desc2, k=2)
+
+# Lowe's Ratio Test
+good_matches = [
+    m for m, n in matches
+    if m.distance < 0.75 * n.distance  # match inequivocamente melhor que o 2º
+]
+</pre>
+
+  <div class="alert alert-orange">
+    <strong>Lowe's Ratio Test:</strong> Se o melhor match é muito próximo do segundo melhor, o ponto é ambíguo e descartado. O threshold 0.75 (de David Lowe, 2004) é o balanço comprovado entre precisão e recall. Para imagens históricas com muito ruído de filme, pode ser necessário diminuir para 0.70.
+  </div>
+
+  <h3>BFMatcher (alternativo)</h3>
+  <p>Brute-Force Matcher com <em>cross-check</em> habilitado. Mais lento que FLANN para grandes conjuntos, mas garante que cada match é mutuamente o melhor vizinho (sem ratio test necessário). Útil quando FLANN falha em espaços de alta dimensão.</p>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════════
+     RANSAC
+     ════════════════════════════════════════════════════════════════ -->
+<section id="ransac">
+  <h2>Estimação de Homografia — RANSAC</h2>
+
+  <p>O <code>RansacHomographyEstimator</code> recebe uma lista de <code>ParCorrespondencia</code> (pares de coordenadas 2D) e estima a homografia 3×3 mais robusta possível.</p>
+
+<pre>
+@dataclass
+class Ponto2D:
+    x: float
+    y: float
+
+@dataclass
+class ParCorrespondencia:
+    origem: Ponto2D      # coordenada na imagem de entrada
+    referencia: Ponto2D  # coordenada na imagem de referência
+
+@dataclass
+class ResultadoHomografia:
+    H: Optional[np.ndarray]    # matriz 3×3
+    mascara_inliers: Optional[np.ndarray]  # 1=inlier, 0=outlier
+    n_corresp: int             # total de pares passados
+    n_inliers: int             # pares dentro do limiar RANSAC
+</pre>
+
+<pre>
+class RansacHomographyEstimator:
+    def __init__(self, reproj_threshold_px=5.0, confidence=0.995):
+        self.reproj_threshold_px = reproj_threshold_px
+        self.confidence = confidence
+
+    def estimate(self, pares: List[ParCorrespondencia]) -> ResultadoHomografia:
+        pts_src = np.float32([(p.origem.x, p.origem.y) for p in pares])
+        pts_ref = np.float32([(p.referencia.x, p.referencia.y) for p in pares])
+
+        H, mask = cv2.findHomography(
+            pts_src, pts_ref,
+            cv2.RANSAC,
+            self.reproj_threshold_px,
+            confidence=self.confidence
+        )
+        n_inliers = int(mask.ravel().sum()) if mask is not None else 0
+        return ResultadoHomografia(H=H, mascara_inliers=mask,
+                                   n_corresp=len(pares), n_inliers=n_inliers)
+</pre>
+
+  <div class="alert alert-blue">
+    <strong>Como funciona o RANSAC:</strong> Seleciona aleatoriamente 4 pares de pontos (mínimo para homografia), estima H, conta inliers (pontos dentro de 5.0 px da projeção), repete até confiança de 99.5%. Retorna a H com mais inliers encontrada.
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════════
+     QUALITY EVALUATOR
+     ════════════════════════════════════════════════════════════════ -->
+<section id="quality">
+  <h2>Avaliador de Qualidade — HomographyQualityEvaluator</h2>
+
+<pre>
+@dataclass(frozen=True)
+class RegrasQualidadeHomografia:
+    min_inliers: int = 4         # mínimo absoluto de inliers
+    min_inlier_ratio: float = 0.2  # mínimo de 20% dos matches
+
+class HomographyQualityEvaluator:
+    def is_acceptable(self, n_inliers: int, n_total: int) -> bool:
+        if n_total <= 0:
+            return False
+        ratio = n_inliers / float(n_total)
+        return (n_inliers >= self.regras.min_inliers) and (ratio >= self.regras.min_inlier_ratio)
+
+    def build_fail_message(self, n_inliers, n_total) -> str:
+        ratio = (n_inliers / float(n_total)) if n_total > 0 else 0.0
+        return (f"Qualidade insuficiente: inliers={n_inliers}/{n_total} "
+                f"(razão={ratio:.2f}), mínimo esperado: "
+                f"inliers>={self.regras.min_inliers} e razão>={self.regras.min_inlier_ratio:.2f}.")
+</pre>
+
+  <p>O critério duplo é importante: poucos inliers absolutos podem indicar imagem com pouca textura; baixo ratio pode indicar muitos falsos positivos no matching. Ambas as condições devem ser satisfeitas para prosseguir.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Cenário</th><th>inliers</th><th>ratio</th><th>Resultado</th></tr></thead>
+      <tbody>
+        <tr><td>Excelente correspondência</td><td>250</td><td>0.85</td><td style="color:var(--green)">✓ Aceito</td></tr>
+        <tr><td>Correspondência mínima</td><td>8</td><td>0.25</td><td style="color:var(--green)">✓ Aceito (limiar mínimo)</td></tr>
+        <tr><td>Muitos matches, maioria outlier</td><td>5</td><td>0.10</td><td style="color:var(--red)">✗ Rejeitado (ratio baixo)</td></tr>
+        <tr><td>Imagem com pouca textura</td><td>3</td><td>0.60</td><td style="color:var(--red)">✗ Rejeitado (inliers insuficientes)</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════════
+     REPROJECTION STATS
+     ════════════════════════════════════════════════════════════════ -->
+<section id="reprojerr">
+  <h2>Erro de Reprojeção — reprojection_stats</h2>
+
+  <p>Módulo em <code>utils/reprojection_stats.py</code>. Após estimar a homografia, calcula o erro de reprojeção de cada inlier: a diferença em pixels entre onde o ponto original é projetado pela homografia e onde o match o colocou na referência.</p>
+
+<pre>
+def reprojection_stats(
+    H: np.ndarray,
+    pares: List[ParCorrespondencia],
+    mask: np.ndarray
+) -> Dict[str, float]:
+    """
+    Retorna: {
+        'rms': float,     # raiz do erro quadrático médio (px)
+        'median': float,  # mediana do erro (px)
+        'p95': float      # percentil 95 do erro (px)
+    }
+    """
+    inlier_pairs = [p for p, m in zip(pares, mask.ravel()) if m]
+    pts_src = np.float32([(p.origem.x, p.origem.y) for p in inlier_pairs])
+    pts_ref = np.float32([(p.referencia.x, p.referencia.y) for p in inlier_pairs])
+
+    pts_proj = cv2.perspectiveTransform(pts_src.reshape(-1,1,2), H).reshape(-1,2)
+    errors = np.linalg.norm(pts_proj - pts_ref, axis=1)
+
+    return {
+        'rms': float(np.sqrt(np.mean(errors**2))),
+        'median': float(np.median(errors)),
+        'p95': float(np.percentile(errors, 95))
+    }
+</pre>
+
+  <div class="alert alert-green">
+    <strong>Interpretação prática:</strong> Para imagens históricas em ~1 m/pixel, um RMS de 2–3 px equivale a precisão de 2–3 metros. Resultados com RMS &lt; 5 px são geralmente aceitáveis para análise histórica; &lt; 2 px para uso cartográfico.
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════════
+     WARP
+     ════════════════════════════════════════════════════════════════ -->
+<section id="warp">
+  <h2>Warp Perspectivo</h2>
+
+  <p>Módulo <code>core/image_processing/warp.py</code>. Aplica a homografia estimada para projetar a imagem de entrada no espaço de coordenadas da referência.</p>
+
+<pre>
+def aplicar_warp_perspective(
+    img_src: np.ndarray,        # imagem de entrada (BGR)
+    H: np.ndarray,              # homografia 3×3
+    output_size: Tuple[int,int],  # (w, h) da referência renderizada
+    interpolation: int = cv2.INTER_CUBIC
+) -> np.ndarray:
+    return cv2.warpPerspective(img_src, H, output_size,
+                                flags=interpolation,
+                                borderMode=cv2.BORDER_CONSTANT,
+                                borderValue=0)
+</pre>
+
+  <p>A interpolação <code>INTER_CUBIC</code> (bicúbica) é usada por padrão, pois produz resultados mais suaves que bilinear, sem os artefatos de ringing do Lanczos em bordas de baixo contraste.</p>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════════
+     GEO
+     ════════════════════════════════════════════════════════════════ -->
+<section id="geo">
+  <h2>Extração de Extensão Geográfica</h2>
+
+  <p>Módulo <code>core/image_processing/geo.py</code>. Converte as coordenadas do crop (em pixels) para coordenadas geográficas, usando a resolução da imagem de referência renderizada.</p>
+
+<pre>
+@dataclass
+class ExtensaoGeo:
+    xmin: float    # longitude/E mínima do crop
+    ymax: float    # latitude/N máxima do crop
+    xres: float    # resolução X (unidades CRS / pixel)
+    yres: float    # resolução Y (unidades CRS / pixel, negativo para raster norte-acima)
+    epsg: str      # código EPSG herdado da camada de referência
+
+def calcular_extensao_geo(
+    bounds: QgsRectangle,   # bounding box da referência em coordenadas geográficas
+    shape_warped: Tuple,    # (h, w) da imagem após warp (tamanho da referência)
+    y_min: int, x_min: int  # canto superior-esquerdo do crop em pixels
+) -> ExtensaoGeo:
+    xres = bounds.width()  / shape_warped[1]
+    yres = bounds.height() / shape_warped[0]
+    nova_xmin = bounds.xMinimum() + x_min * xres
+    nova_ymax = bounds.yMaximum() - y_min * yres
+    return ExtensaoGeo(xmin=nova_xmin, ymax=nova_ymax,
+                       xres=xres, yres=-yres, epsg=...)
+</pre>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════════
+     SAVE GEOTIFF
+     ════════════════════════════════════════════════════════════════ -->
+<section id="save">
+  <h2>Salvar GeoTIFF com Overviews</h2>
+
+  <p>Módulo <code>core/image_processing/save_geotiff.py</code>. Reamostrar a imagem para a resolução alvo, salvar com metadados geoespaciais completos e construir overviews para visualização eficiente em SIG.</p>
+
+<pre>
+@dataclass
+class ReamostragemConfig:
+    target_resolution: float = 1.0      # metros/pixel
+    interpolation: int = cv2.INTER_CUBIC
+    clamp_upsampling: bool = False       # evita ampliar imagem além do original
+    overview_levels: List[int] = (2, 4, 8, 16)
+    jpeg_quality: int = 85
+
+def salvar_geotiff_com_overviews(
+    img_bgr: np.ndarray,
+    extensao: ExtensaoGeo,
+    output_path: str,
+    cfg: ReamostragemConfig
+) -> None:
+    # 1. Calcular nova dimensão
+    geo_width  = abs(extensao.xres * img_bgr.shape[1])
+    geo_height = abs(extensao.yres * img_bgr.shape[0])
+    new_w = max(1, round(geo_width  / cfg.target_resolution))
+    new_h = max(1, round(geo_height / cfg.target_resolution))
+
+    # 2. Reamostrar
+    img_resampled = cv2.resize(img_bgr, (new_w, new_h), interpolation=cfg.interpolation)
+    img_rgb = cv2.cvtColor(img_resampled, cv2.COLOR_BGR2RGB)
+
+    # 3. Escrever GeoTIFF com rasterio
+    new_xres = geo_width  / new_w
+    new_yres = geo_height / new_h
+    transform = rasterio.transform.from_origin(extensao.xmin, extensao.ymax,
+                                                new_xres, new_yres)
+    with rasterio.open(output_path, 'w',
+                       driver='GTiff', crs=f'EPSG:{extensao.epsg}',
+                       transform=transform, dtype='uint8',
+                       width=new_w, height=new_h, count=3,
+                       compress='jpeg', jpeg_quality=cfg.jpeg_quality,
+                       photometric='ycbcr', nodata=0) as dst:
+        dst.write(img_rgb.transpose(2,0,1))
+        dst.build_overviews(list(cfg.overview_levels), Resampling.average)
+        dst.update_tags(ns='rio_overview', resampling='average')
+</pre>
+
+  <div class="alert alert-orange">
+    <strong>Overviews (pirâmides):</strong> Níveis 2×/4×/8×/16× reduzem o tempo de renderização no QGIS de minutos para segundos ao visualizar a imagem em escalas menores. São construídos internamente no arquivo GeoTIFF (COG — Cloud Optimized GeoTIFF compatível).
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════════
+     PROCESS LOGGER
+     ════════════════════════════════════════════════════════════════ -->
+<section id="logger">
+  <h2>ProcessLogger — Log Estruturado com Timers</h2>
+
+  <p>Módulo <code>utils/process_logger.py</code>. Registra cada fase do pipeline com duração em segundos e métricas K=V, e escreve o resultado como JSON atômico (write temp + rename) para evitar arquivos corrompidos.</p>
+
+<pre>
+class ProcessLogger:
+    def start(self, phase: str) -> None:
+        """Inicia o timer da fase."""
+        self._timers[phase] = time.perf_counter()
+
+    def end(self, phase: str) -> float:
+        """Para o timer e registra a duração em segundos."""
+        elapsed = time.perf_counter() - self._timers[phase]
+        self._durations[phase] = elapsed
+        return elapsed
+
+    def log(self, key: str, value) -> None:
+        """Registra um par K=V (métrica, parâmetro, etc.)."""
+        self._data[key] = value
+
+    def write_to_file(self, output_dir: str, filename: str = "process_log.json") -> None:
+        """Escreve JSON atômico: cria temp → rename."""
+        payload = {
+            'durations_s': self._durations,
+            'metrics': self._data,
+            'timestamp': datetime.now().isoformat()
+        }
+        tmp = os.path.join(output_dir, filename + '.tmp')
+        dst = os.path.join(output_dir, filename)
+        with open(tmp, 'w', encoding='utf-8') as f:
+            json.dump(payload, f, indent=2, ensure_ascii=False)
+        os.replace(tmp, dst)  # operação atômica no sistema de arquivos
+</pre>
+
+  <p><strong>Exemplo de saída JSON:</strong></p>
+<pre>
+{
+  "durations_s": {
+    "render_ref": 2.341,
+    "load_input": 0.087,
+    "detect_src": 3.120,
+    "detect_ref": 1.980,
+    "match": 0.543,
+    "ransac": 0.021,
+    "warp": 0.412,
+    "crop": 0.003,
+    "geo_calc": 0.001,
+    "save": 4.230
+  },
+  "metrics": {
+    "kp_src": 8420,
+    "kp_ref": 6130,
+    "matches_raw": 2180,
+    "matches_good": 890,
+    "inliers": 412,
+    "inlier_ratio": 0.463,
+    "reproj_rms": 1.87,
+    "reproj_median": 1.42,
+    "reproj_p95": 3.91
+  },
+  "timestamp": "2026-05-07T14:23:11.042"
+}
+</pre>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════════
+     MOSAIC PIPELINE
+     ════════════════════════════════════════════════════════════════ -->
+<section id="mosaic">
+  <h2>Pipeline de Mosaico (Não Georreferenciado)</h2>
+
+  <p>Módulo <code>core/mosaic/pipeline.py</code>. Antes do georreferenciamento, é possível combinar múltiplos fotogramas em um único mosaico usando homografias. Isso é útil quando a área de interesse foi fotografada em várias passagens com sobreposição.</p>
+
+  <h3>gerar_mosaicos_nao_georef()</h3>
+  <p>Função orquestradora que executa o processo em etapas iterativas até não conseguir mais combinações:</p>
+
+<pre>
+def gerar_mosaicos_nao_georef(
+    paths: Iterable[str],     # caminhos das imagens a combinar
+    pasta_saida: str,         # diretório para GeoTIFFs finais
+    cfg: MosaicConfig,        # configurações do mosaico
+    ext_final: str            # extensão da saída (.jpg, .tif, etc.)
+) -> List[str]:
+    # Inicializa diretório temporário
+    # Loop de etapas: combina pares até estabilizar
+    while len(imagens) > 1:
+        num_antes = len(imagens)
+        imagens = _combinar_passada(imagens, tmp_dir_etapa, etapa)
+        if len(imagens) >= num_antes:
+            break  # nenhuma nova combinação possível
+        etapa += 1
+    # Copia resultados finais e limpa temporários
+</pre>
+
+  <h3>_combinar_passada() — Lógica Gulosa por Etapa</h3>
+  <p>Para cada imagem não usada, encontra o melhor par (mais inliers, mínimo 50) e cria o mosaico. Imagens sem par válido são mantidas isoladas para a próxima etapa.</p>
+
+<pre>
+for i in range(len(imagens)):
+    for j in range(i + 1, len(imagens)):
+        H, n_matches = _encontrar_pontos_homologos(img1, img2, resize_factor)
+        if H is not None and n_matches >= 50:
+            if n_matches > melhor_n_matches:
+                melhor_mosaico_data = _fazer_mosaico(img1, img2, H)
+                melhor_n_matches = n_matches
+
+if melhor_mosaico_data is not None:
+    cv2.imwrite(nome_mosaico, melhor_mosaico_data)
+</pre>
+
+  <h3>_fazer_mosaico() — Criação do Canvas</h3>
+  <p>Calcula o canvas mínimo que abrange ambas as imagens após a projeção, aplica o warp na img2 e mescla img1 sobre o resultado (pixels &gt; 10 em qualquer canal prevalecem).</p>
+
+  <div class="alert alert-orange">
+    <strong>Gestão de memória:</strong> Imagens históricas digitalizadas em alta resolução podem ter 500 MB+ cada. O pipeline usa <code>del img; gc.collect()</code> explicitamente após cada operação e chama <code>QApplication.processEvents()</code> em cada iteração para manter a UI responsiva durante processos longos.
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════════
+     MI GUESSING
+     ════════════════════════════════════════════════════════════════ -->
+<section id="miguessing">
+  <h2>MI Guessing — Busca por Localização Desconhecida</h2>
+
+  <p>Módulo <code>core/miguessing.py</code>. Quando a localização geográfica aproximada de uma imagem histórica é desconhecida, o sistema divide o polígono de busca em uma grade e tenta georreferenciar a imagem em cada célula, identificando a melhor correspondência.</p>
+
+  <h3>divideWithMetricSuperposition()</h3>
+  <p>Divide um bounding box em uma grade <code>N×N</code> com sobreposição métrica configurável entre células adjacentes:</p>
+
+<pre>
+def divideWithMetricSuperposition(
+    bbox: QgsRectangle,
+    superposition: Tuple[float, float],   # sobreposição (sX, sY) em unidades CRS
+    config: GeoreferencingConfig = GeoreferencingConfig()
+) -> List[QgsRectangle]:
+    """
+    Gera config.search_division² células.
+    Cada célula sobrepõe sX unidades com a vizinha à direita
+    e sY unidades com a vizinha abaixo.
+    """
+    divs = config.search_division  # padrão: 20 → 400 células
+    dX = (sX * (divs - 1) + bbox.xMaximum() - bbox.xMinimum()) / divs
+    dY = (sY * (divs - 1) + bbox.yMaximum() - bbox.yMinimum()) / divs
+    pX = [bbox.xMinimum() + (dX - sX) * n for n in range(divs)]
+    pY = [bbox.yMinimum() + (dY - sY) * n for n in range(divs)]
+    return [QgsRectangle(pX[i], pY[j], pX[i]+dX, pY[j]+dY)
+            for i in range(divs) for j in range(divs)]
+</pre>
+
+  <h3>descImg() e descRef() — Pré-computação de Descritores</h3>
+  <p>Para eficiência, os descritores da imagem de entrada são calculados uma vez (<code>descImg()</code>) e reutilizados para cada célula da grade. A referência é renderizada e descrita separadamente para cada célula (<code>descRef()</code>).</p>
+
+  <h3>check() — Avaliação de uma Célula</h3>
+  <p>Executa matching + RANSAC + avaliação de qualidade para um par (imagem, célula de referência). Retorna <code>(aceito, resultado, pares, stats, inliers)</code>.</p>
+
+<pre>
+def check(image: Image, reference: Reference, config, ...) -> Optional[Tuple]:
+    matcher = FLANNMatcher()
+    good_matches, raw_matches = matcher.match(
+        image.descriptors, reference.descriptors,
+        image.keypoints, reference.keypoints
+    )
+    estimador = RansacHomographyEstimator(...)
+    resultado = estimador.estimate(pares)
+    avaliador = HomographyQualityEvaluator(RegrasQualidadeHomografia(...))
+    aceito = avaliador.is_acceptable(resultado.n_inliers, resultado.n_corresp)
+    stats = reprojection_stats(resultado.H, pares, resultado.mascara_inliers)
+    return aceito, resultado, pares, stats, inliers
+</pre>
+
+  <h3>zoom_to_spatial_res()</h3>
+  <p>Converte nível de zoom de mapa (1–20) para resolução espacial em metros/pixel no sistema de coordenadas Web Mercator (EPSG:3857):</p>
+<pre>
+def zoom_to_spatial_res(zoom: int) -> float:
+    return 156416.0 / pow(2, zoom)
+# zoom 14 → ~9.55 m/px  |  zoom 17 → ~1.19 m/px  |  zoom 19 → ~0.30 m/px
+</pre>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════════
+     RENDER
+     ════════════════════════════════════════════════════════════════ -->
+<section id="render">
+  <h2>Renderização da Camada de Referência</h2>
+
+  <p>Módulo <code>core/render/render_reference.py</code>. Converte a camada QGIS (raster ou vetor) na extensão do polígono para um array NumPy, simulando o que o usuário vê no canvas do QGIS.</p>
+
+  <h3>render_reference_image_to_size()</h3>
+<pre>
+def render_reference_image_to_size(
+    layer,
+    polygon_geom: QgsGeometry,
+    width: int = 2000,
+    debug_output_dir: str = None
+) -> Tuple[Optional[np.ndarray], Optional[QgsRectangle], Optional[str], Optional[str]]:
+    """
+    Retorna: (array BGR, bounds, epsg_code, path_geotiff_temp)
+    """
+    bounds = polygon_geom.boundingBox()
+    height = int((bounds.height() / bounds.width()) * width)
+
+    settings = QgsMapSettings()
+    settings.setLayers([layer])
+    settings.setExtent(bounds)
+    settings.setDestinationCrs(layer.crs())
+    settings.setOutputSize(QSize(width, height))
+
+    image = QImage(QSize(width, height), QImage.Format_ARGB32)
+    painter = QPainter(image)
+    job = QgsMapRendererCustomPainterJob(settings, painter)
+    job.start()
+    job.waitForFinished()
+    painter.end()
+
+    # Converte QImage → NumPy BGR
+    ptr = image.constBits()
+    arr = np.frombuffer(ptr, dtype=np.uint8).reshape((height, width, 4))
+    bgr = arr[:, :, :3][:, :, ::-1]  # BGRA → BGR
+    return bgr, bounds, str(layer.crs().authid()).split(':')[1], path_temp
+</pre>
+
+  <p>O método <code>render_reference_image_to_spatial_resolution()</code> (alternativo, comentado no código) aceita resolução em metros/pixel em vez de largura fixa, usando <code>zoom_to_spatial_res()</code> para calcular a escala correta.</p>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════════
+     TABELA DE MÉTRICAS
+     ════════════════════════════════════════════════════════════════ -->
+<section id="tabela-metricas">
+  <h2>Tabela Completa de Métricas</h2>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Métrica</th><th>Tipo</th><th>Fase</th><th>Onde é armazenada</th><th>Interpretação</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>kp_src</code></td><td>int</td><td>Detecção</td><td>ProcessLogger + log INFO</td><td>Textura detectável na imagem histórica; &lt;100 sugere baixa qualidade</td></tr>
+        <tr><td><code>kp_ref</code></td><td>int</td><td>Detecção</td><td>ProcessLogger + log INFO</td><td>Textura na referência; deve ser comparável a kp_src</td></tr>
+        <tr><td><code>matches_raw</code></td><td>int</td><td>Matching</td><td>ProcessLogger + log INFO</td><td>Total antes do ratio test; indica volume de candidatos</td></tr>
+        <tr><td><code>matches_good</code></td><td>int</td><td>Matching</td><td>ProcessLogger + log INFO</td><td>Após ratio test 0.75; base para RANSAC</td></tr>
+        <tr><td><code>inliers</code></td><td>int</td><td>RANSAC</td><td>ProcessLogger + log INFO</td><td>Correspondências geometricamente consistentes; ≥8 obrigatório</td></tr>
+        <tr><td><code>inlier_ratio</code></td><td>float 0–1</td><td>Qualidade</td><td>ProcessLogger</td><td>Fração de good_matches que são inliers; ≥0.20 obrigatório</td></tr>
+        <tr><td><code>reproj_rms</code></td><td>float px</td><td>Qualidade</td><td>ProcessLogger + JSON</td><td>Precisão média da homografia; &lt;3 px = bom, &lt;5 px = aceitável</td></tr>
+        <tr><td><code>reproj_median</code></td><td>float px</td><td>Qualidade</td><td>ProcessLogger + JSON</td><td>Precisão para a maioria dos pontos; robusta a outliers extremos</td></tr>
+        <tr><td><code>reproj_p95</code></td><td>float px</td><td>Qualidade</td><td>ProcessLogger + JSON</td><td>Pior caso esperado para 95% dos pontos; &lt;10 px = aceitável</td></tr>
+        <tr><td><code>render_ref (s)</code></td><td>float s</td><td>Timer</td><td>ProcessLogger JSON</td><td>Tempo de renderização; depende do tamanho do polígono</td></tr>
+        <tr><td><code>detect_src (s)</code></td><td>float s</td><td>Timer</td><td>ProcessLogger JSON</td><td>Tempo de detecção SIFT; escala com resolução da imagem</td></tr>
+        <tr><td><code>match (s)</code></td><td>float s</td><td>Timer</td><td>ProcessLogger JSON</td><td>Tempo de matching FLANN; escala com kp_src × kp_ref</td></tr>
+        <tr><td><code>save (s)</td><td>float s</td><td>Timer</td><td>ProcessLogger JSON</td><td>Tempo de escrita GeoTIFF + overviews; dominante em imagens grandes</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════════
+     ROADMAP
+     ════════════════════════════════════════════════════════════════ -->
+<section id="roadmap">
+  <h2>Próximos Passos — Roadmap de Melhorias</h2>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Prioridade</th><th>Item</th><th>Esforço</th><th>Impacto</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><span class="badge badge-red" style="font-size:.7rem">P1</span></td>
+          <td><strong>Exportar métricas por imagem em CSV</strong> — salvar kp, matches, inliers, reproj_rms para cada imagem processada no lote</td>
+          <td>Baixo (1 dia)</td>
+          <td>Alto — diagnóstico de falhas em lote</td>
+        </tr>
+        <tr>
+          <td><span class="badge badge-red" style="font-size:.7rem">P1</span></td>
+          <td><strong>CLAHE no pré-processamento</strong> — aplicar equalização adaptativa antes da detecção de features para aumentar keypoints em imagens de baixo contraste</td>
+          <td>Baixo (meio dia)</td>
+          <td>Alto — +20–40% keypoints em imagens antigas</td>
+        </tr>
+        <tr>
+          <td><span class="badge badge-orange" style="font-size:.7rem">P2</span></td>
+          <td><strong>Análise de densidade por tile</strong> — dividir imagens em tiles 512×512 px, executar matching por tile, gerar heatmap de correspondências para diagnóstico visual</td>
+          <td>Médio (3 dias)</td>
+          <td>Alto — identifica regiões problemáticas</td>
+        </tr>
+        <tr>
+          <td><span class="badge badge-orange" style="font-size:.7rem">P2</span></td>
+          <td><strong>Referência incremental</strong> — usar GeoTIFFs georreferenciados anteriormente como referência para as imagens seguintes, propagando precisão no lote</td>
+          <td>Médio (3 dias)</td>
+          <td>Alto — melhora consistência de sequências</td>
+        </tr>
+        <tr>
+          <td><span class="badge badge-orange" style="font-size:.7rem">P2</span></td>
+          <td><strong>Adaptive Ratio Test</strong> — relaxar progressivamente (0.75 → 0.85) até atingir mínimo de good_matches, ao invés de falhar com threshold fixo</td>
+          <td>Baixo (1 dia)</td>
+          <td>Médio — recupera imagens com poucos features</td>
+        </tr>
+        <tr>
+          <td><span class="badge badge-blue" style="font-size:.7rem">P3</span></td>
+          <td><strong>Multi-escala matching</strong> — detectar keypoints em 0.5×/1.0×/1.5× e combinar antes da estimação de homografia</td>
+          <td>Médio (2 dias)</td>
+          <td>Alto — captura features em diferentes escalas</td>
+        </tr>
+        <tr>
+          <td><span class="badge badge-blue" style="font-size:.7rem">P3</span></td>
+          <td><strong>Unsharp mask no pré-processamento</strong> — realce de bordas para aumentar detectabilidade de keypoints em imagens com foco suave (filme antigo)</td>
+          <td>Baixo (meio dia)</td>
+          <td>Médio — melhora qualidade visual dos descritores</td>
+        </tr>
+        <tr>
+          <td><span class="badge badge-purple" style="font-size:.7rem">P4</span></td>
+          <td><strong>SuperPoint + LightGlue</strong> — substituir RootSIFT+FLANN por detector e matcher baseados em redes neurais (state-of-the-art em correspondência de imagens)</td>
+          <td>Alto (2 semanas)</td>
+          <td>Muito alto — +200% keypoints, matching mais robusto</td>
+        </tr>
+        <tr>
+          <td><span class="badge badge-purple" style="font-size:.7rem">P4</span></td>
+          <td><strong>Verificação geométrica por região</strong> — usar posição geográfica estimada para filtrar matches geograficamente implausíveis antes do RANSAC</td>
+          <td>Alto (1 semana)</td>
+          <td>Alto — elimina falsos positivos de regiões distantes</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="alert alert-green">
+    <strong>Valor para acervos históricos:</strong> Com as melhorias P1 e P2 implementadas, o GeorefAuto estará pronto para processar acervos completos de voos históricos (décadas de 1950–1980) de forma confiável, produzindo GeoTIFFs com precisão de 2–5 metros adequada para análise de mudança histórica de uso do solo, mapeamento de áreas de risco e preservação do patrimônio cultural cartográfico.
+  </div>
+
+  <div style="text-align:center; margin-top:3rem; padding:2rem; color:var(--muted); font-size:.82rem; border-top:1px solid var(--border);">
+    GeorefAuto — branch <strong>dev-alvarez</strong> — Documentação Técnica gerada em 2026-05-07<br>
+    Plugin QGIS para georreferenciamento automático de fotografias aéreas históricas
+  </div>
+</section>
+
+</main>
+
+<script>
+  // Highlight sidenav item on scroll
+  const sections = document.querySelectorAll('section[id], div[id]');
+  const navLinks = document.querySelectorAll('nav#sidenav a');
+  const observer = new IntersectionObserver(entries => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        navLinks.forEach(a => a.classList.remove('active'));
+        const link = document.querySelector(`nav#sidenav a[href="#${entry.target.id}"]`);
+        if (link) link.classList.add('active');
+      }
+    });
+  }, { threshold: 0.2, rootMargin: '-10% 0px -70% 0px' });
+  sections.forEach(s => observer.observe(s));
+</script>
+
+</body>
+</html>

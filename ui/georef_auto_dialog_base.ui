@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <ui version="4.0">
- <class>GeorefAutoDialog</class>
- <widget class="QDialog" name="GeorefAutoDialog">
+ <class>GeorefAuto_refatoreDialog</class>
+ <widget class="QDialog" name="GeorefAuto_refatoreDialog">
   <property name="geometry">
    <rect>
     <x>0</x>
     <y>0</y>
     <width>500</width>
-    <height>480</height>
+    <height>491</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -73,6 +73,13 @@
      </property>
      <layout class="QVBoxLayout" name="verticalLayout_3">
       <item>
+       <widget class="QPushButton" name="btnCreateCache">
+        <property name="text">
+         <string>Create WMS Cache</string>
+        </property>
+       </widget>
+      </item>
+      <item>
        <widget class="QComboBox" name="comboReferenceLayer"/>
       </item>
      </layout>
@@ -100,11 +107,11 @@
       </item>
       <item>
        <widget class="QLabel" name="labelPolygonArea">
-        <property name="text">
-         <string>Area: 0.00 km² (max: 3,050 km²)</string>
-        </property>
         <property name="styleSheet">
          <string>font-weight: bold;</string>
+        </property>
+        <property name="text">
+         <string>Area: 0.00 km² (max: 5,050 km²)</string>
         </property>
        </widget>
       </item>
